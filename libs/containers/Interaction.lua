@@ -14,6 +14,7 @@ local Interaction, get = class("Interaction", Snowflake)
 function Interaction:__init(data, parent)
   Snowflake.__init(self, data, parent)
   self._api = parent._api -- a bit easier to navigate
+  self._data = data.data
 
   -- Handle guild and guild_id
   do local guildId = data.guild_id
