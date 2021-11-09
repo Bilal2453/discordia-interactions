@@ -1,6 +1,6 @@
 return {
   name = "Bilal2453/discordia-interactions",
-  version = "0.0.1",
+  version = "0.0.2",
   description = "A Discordia library extension that enables receiving and responding to Discord's Interactions.",
   tags = { "discord", "discordia", "interactions" },
   license = "Apache License 2.0",

@@ -137,9 +137,7 @@ function Interaction:reply(msg, isEphemeral)
 
   -- Choose desired method depending on the context
   local method
-  if self._deferred then
-    method = self.editReply
-  elseif self._initialRes then
+  if self._initialRes or self._deferred then
     method = self._sendFollowup
   else
     method = self._sendMessage
@@ -151,12 +149,12 @@ end
 @m replyDeferred
 @t http
 @op isEphemeral boolean
-@r Message
+@r boolean
 @d Constructs an initial response that's deferred.
 Deferred reply can only be an initial response, and when used it will basically send a message that says
 "Bot is thinking...", and once `:reply` is used again it will edit that message.
 
-Returns the newly sent message (?).
+Returns `true` on success, otherwise `false, err`.
 ]=]
 function Interaction:replyDeferred(isEphemeral)
   local msg = isEphemeral and {flags = messageFlag.ephemeral} or nil
