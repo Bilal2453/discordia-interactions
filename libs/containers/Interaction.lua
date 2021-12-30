@@ -8,6 +8,7 @@ allowing you to respond and reply to user interactions.
 
 local discordia = require("discordia")
 local Resolver = require("client/Resolver")
+local ported = require("ported")
 local enums = require("enums")
 local bit = require("bit")
 
@@ -16,6 +17,7 @@ local class = discordia.class
 local classes = class.classes
 local Snowflake = classes.Snowflake
 local messageFlag = enums.messageFlag
+local parseMessage = ported.parseMessage
 
 local Interaction, get = class("Interaction", Snowflake)
 
@@ -90,11 +92,11 @@ function Interaction:__init(data, parent)
   self._deferred = false
 end
 
-function Interaction:_sendMessage(payload, deferred)
+function Interaction:_sendMessage(payload, files, deferred)
   local data, err = self._api:createInteractionResponse(self.id, self._token, {
     type = deferred and 5 or 4,
     data = payload
-  })
+  }, files)
   if data then
     self._initialRes = true
     self._deferred = deferred or false
@@ -104,31 +106,26 @@ function Interaction:_sendMessage(payload, deferred)
   end
 end
 
-function Interaction:_sendFollowup(msg)
-  local data, err = self._api:executeWebhook(self._application_id, self._token, msg)
+function Interaction:_sendFollowup(payload, files)
+  local data, err = self._api:createWebhookMessage(self._application_id, self._token, payload, files)
   return data and self._channel._messages:_insert(data), err
 end
 
 --[=[
 @m reply
 @t http
-@p data string/table
+@p content string/table
 @op isEphemeral boolean
-@r ??
-@d Constructs a new reply to said interaction. If this is the first reply an initial one is sent,
-if previous reply was a deferred response, this will edit it to provided content,
-otherwise if previous reply is fully sent, this sends a followup response.
+@r TODO
+@d Sends an interaction reply. An initial response is sent on first call of this,
+if an initial response was already sent a followup message is sent instead.
+If initial response was a deferred response, calling this will properly edit the deferred message.
 
-Returns may not be constant because blame Discord.
+Returns may not be consistent because blame Discord.
 ]=]
-function Interaction:reply(msg, isEphemeral)
-  local msgType = type(msg)
-  if msgType == "table" then
-    isEphemeral = isEphemeral and true or msg.ephemeral
-    msg.ephemeral = nil
-  else
-    msg = {content = tostring(msg)}
-  end
+function Interaction:reply(content, isEphemeral)
+  isEphemeral = isEphemeral and true or type(content) == "table" and content.ephemeral
+  local msg, files = parseMessage(content)
 
   -- Handle ephemeral flags setting
   if isEphemeral then
@@ -142,7 +139,7 @@ function Interaction:reply(msg, isEphemeral)
   else
     method = self._sendMessage
   end
-  return method(self, msg) -- TODO: make sure returns are constant, or should they not be constant?
+  return method(self, msg, files) -- TODO: make sure returns are consistent, or it's fine like this?
 end
 
 --[=[
@@ -150,15 +147,15 @@ end
 @t http
 @op isEphemeral boolean
 @r boolean
-@d Constructs an initial response that's deferred.
-Deferred reply can only be an initial response, and when used it will basically send a message that says
-"Bot is thinking...", and once `:reply` is used again it will edit that message.
+@d Sends a deferred interaction reply.
+Deferred replies can only be sent as initial responses.
+A deferred reply displays "Bot is thinking..." to users, and once `:reply` is called again, deferred message will be edited.
 
 Returns `true` on success, otherwise `false, err`.
 ]=]
 function Interaction:replyDeferred(isEphemeral)
   local msg = isEphemeral and {flags = messageFlag.ephemeral} or nil
-  return self:_sendMessage(msg, true)
+  return self:_sendMessage(msg, nil, true)
 end
 
 --[=[
@@ -166,9 +163,9 @@ end
 @t http
 @op id Message-ID-Resolvable
 @r Message
-@d Returns a reply message with the provided id, if no id was provided the original response message is returned.
+@d Fetches a previously sent interaction response. If response `id` was not provided, the original interaction response is fetched instead.
 
-**Ephemeral Messages Cannot be Retrieved**
+Note: **Ephemeral messages cannot be retrieved once sent.**
 ]=]
 function Interaction:getReply(id)
   id = Resolver.messageId(id) or "@original"
@@ -179,18 +176,17 @@ end
 --[=[
 @m editReply
 @t http
-@p payload table/string
+@p content table/string
 @op id Message-ID-Resolvable
 @r Message
-@d Modifies a response message with the provided id, if no id was provided original response is modified instead.
-`payload` is raw Message-alike table, if string is provided it is treated as `content` field
+@d Modifies a previously sent interaction response. If response `id` was not provided, initial interaction response is edited instead.
 
-**Ephemeral Messages Cannot be Modified**
+Note: **Ephemeral messages cannot be modified once sent.**
 ]=]
-function Interaction:editReply(payload, id)
+function Interaction:editReply(content, id)
   id = Resolver.messageId(id) or self._message.id
-  payload = type(payload) == "table" and payload or {content = tostring(payload)}
-  local data, err = self._api:editWebhookMessage(self._application_id, self._token, id, payload)
+  local msg, files = parseMessage(content)
+  local data, err = self._api:editWebhookMessage(self._application_id, self._token, id, msg, files)
   return data and true, err
 end
 
@@ -199,10 +195,9 @@ end
 @t http
 @p payload table/string
 @r Message
-@d Modifies a response message with the provided id, if no id was provided original response is modified instead.
-`payload` is raw Message-alike table, if string is provided it is treated as `content` field
+@d Deletes a previously sent response. If `id` was not provided, original interaction response is deleted instead.
 
-**Ephemeral Messages Cannot be Modified**
+Note: **Ephemeral messages cannot be deleted once sent.**
 ]=]
 function Interaction:deleteReply(id)
   id = Resolver.messageId(id) or "@original"
@@ -210,11 +205,11 @@ function Interaction:deleteReply(id)
   return data and true, err
 end
 
-function Interaction:_sendUpdate(payload)
+function Interaction:_sendUpdate(payload, files)
   local data, err = self._api:createInteractionResponse(self.id, self._token, {
     type = payload and 7 or 6,
     data = payload
-  })
+  }, files)
   if data then
     self._initialRes = true
     self._deferred = not payload and true
@@ -227,34 +222,39 @@ end
 --[=[
 @m update
 @t http
-@p data table/string
-@r Message
-@d Responds to a component-based interaction by modifying the original bot's message. `msg` is similar to editReply.
+@p content table/string
+@r boolean
+@d Responds to a component-based interaction by modifying the original bot's message the components were attached to.
 
-Returns the original modified bot message (?).
+Returns `true` on success, otherwise `false, err`.
 ]=]
-function Interaction:update(msg)
+function Interaction:update(content)
   assert(self._message, "UPDATE_MESSAGE is only supported by components-based interactions!")
-  if msg == nil and not self._initialRes then
+  local msg, files = parseMessage(content)
+  if not msg and not self._initialRes then
     return self:_sendUpdate()
-  elseif type(msg) ~= "table" then
-    msg = {content = tostring(msg)}
   end
   if self._initialRes then
-    return self._message:_modify(msg) -- TODO: make sure returns here are constant with _sendUpdate returns
+    local data, err = self._api:editMessage(self._message._parent._id, self._message._id, msg, files)
+    if data then
+      self:_setOldContent(data)
+      self:_load(data)
+      return true
+    end
+    return false, err
   else
-    return self:_sendUpdate(msg)
+    return self:_sendUpdate(msg, files)
   end
 end
 
 --[=[
 @m updateDeferred
 @t http
-@r Message
+@r boolean
 @d Responds to a component-based interaction by acknowledging the interaction,
 where the next used `reply`/`update` methods will update the original bot message.
 
-Returns the original bot message (?).
+Returns `true` on success, otherwise `false, err`.
 ]=]
 function Interaction:updateDeferred()
   return self:_sendUpdate()
