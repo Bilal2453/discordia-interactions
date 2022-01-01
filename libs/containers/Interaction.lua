@@ -39,7 +39,7 @@ function Interaction:__init(data, parent)
 
   -- Handle channel and channel_id
   do local channelId = data.channel_id
-    if not channelId then goto skip_channel_handling end
+    if not channelId then goto skip end
     -- First try retrieving it from cache
     if self._guild then
       self._channel = self._guild._text_channels:get(channelId)
@@ -49,7 +49,7 @@ function Interaction:__init(data, parent)
     -- Last resort, request the channel object from the API if wasn't cached
     if not self._channel then
       local channel = self._api:getChannel(channelId)
-      if not channel then goto skip_channel_handling end -- somehow channel not available
+      if not channel then goto skip end -- somehow channel not available
 
       local guild = channel.guild and parent._guilds:_insert(channel.guild)
       if guild then
@@ -58,22 +58,25 @@ function Interaction:__init(data, parent)
         self._channel = parent._private_channels:_insert(channel)
       end
     end
-    ::skip_channel_handling::
+    ::skip::
   end
 
   -- Handle user and member
   do
+    if data.member and self._guild then
+      self._member = self._guild._members:_insert(data.member)
+      self._user = parent._users:_insert(data.member.user)
+      goto skip
+    end
     if data.user then
       self._user = parent._users:_insert(data.user)
     end
-    if data.member and self._guild then
-      self._member = self._guild._members:_insert(data.member)
-    end
+    ::skip::
   end
 
   -- Handle message
   do
-    if not data.message then goto skip_message_handling end
+    if not data.message then goto skip end
     if self._channel then
       self._message = self._channel._messages:_insert(data.message)
     elseif data.message.channel then
@@ -86,7 +89,7 @@ function Interaction:__init(data, parent)
       end
       self._message = cache and cache._messages:_insert(data.message)
     end
-    ::skip_message_handling::
+    ::skip::
   end
 
   -- Define Interaction state tracking
@@ -240,8 +243,8 @@ function Interaction:update(content)
   if self._initialRes then
     local data, err = self._api:editMessage(self._message._parent._id, self._message._id, msg, files)
     if data then
-      self:_setOldContent(data)
-      self:_load(data)
+      self._message:_setOldContent(data)
+      self._message:_load(data)
       return true
     end
     return false, err
@@ -264,66 +267,71 @@ function Interaction:updateDeferred()
 end
 
 --[=[@p applicationId string A unique snowflake ID of the application.]=]
-function get.applicationId(self)
+function get:applicationId()
   return self._application_id
 end
 
 --[=[@p type number The Interaction type, see interactionType enum.]=]
-function get.type(self)
+function get:type()
   return self._type
 end
 
 --[=[@p guildId string/nil The Snowflake ID of the guild the interaction happened at, if any.]=]
-function get.guildId(self)
+function get:guildId()
   return self._guild_id
 end
 
 --[=[@p guild Guild/nil The Guild object the interaction happened at. Equivalent to `Client:getGuild(Interaction.guildId)`.]=]
-function get.guild(self)
+function get:guild()
   return self._guild
 end
 
 --[=[@p channelId string The Snowflake ID of the channel the interaction was made at.
 Should always be provided, but keep in mind Discord flags it as optional for future-proofing.]=]
-function get.channelId(self)
+function get:channelId()
   return self._channel_id
 end
 
 --[=[@p channel channel/nil The Channel object the interaction exists at.
 Equivalent to `Client:getChannel(Interaction.channelId)`.]=]
-function get.channel(self)
+function get:channel()
   return self._channel
 end
 
 --[=[@p message message/nil The message the interaction was attached to. Currently only provided for components-based interactions.]=]
-function get.message(self)
+function get:message()
   return self._message
 end
 
 --[=[@p member member/nil The member who interacted with the application in a guild.]=]
-function get.member(self)
+function get:member()
   return self._member
 end
 
 --[=[@p user user The User object of who interacted with the application, should always be available.]=]
-function get.user(self)
+function get:user()
   return self._user
 end
 
 --[=[@p data table The raw data of the interaction. See [Interaction Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-resolved-data-structure)]=]
-function get.data(self)
+function get:data()
   return self._data
 end
 
 --[=[@p token string The interaction token. What allows you to responds to a specific interaction.
 This is a secret and shouldn't be exposed, if leaked anyone can send messages on behalf of your bot.]=]
-function get.token(self)
+function get:token()
   return self._token
 end
 
 --[=[@p version string The interaction version. (Currently not useful at all)]=]
-function get.version(self)
+function get:version()
   return self._version
+end
+
+--[=[@p locale string The user's client language and locale.]=]
+function get:locale()
+  return self._locale
 end
 
 return Interaction
