@@ -18,6 +18,8 @@ local classes = class.classes
 local Snowflake = classes.Snowflake
 local messageFlag = enums.messageFlag
 local parseMessage = ported.parseMessage
+local callbackType = enums.interactionCallbackType
+local channelType = discordia.enums.channelType
 
 local Interaction, get = class("Interaction", Snowflake)
 
@@ -52,7 +54,7 @@ function Interaction:__init(data, parent)
       local guild = channel.guild and parent._guilds:_insert(channel.guild)
       if guild then
         self._channel = guild._text_channels:_insert(channel)
-      elseif channel.type == 1 then
+      elseif channel.type == channelType.private then
         self._channel = parent._private_channels:_insert(channel)
       end
     end
@@ -94,7 +96,7 @@ end
 
 function Interaction:_sendMessage(payload, files, deferred)
   local data, err = self._api:createInteractionResponse(self.id, self._token, {
-    type = deferred and 5 or 4,
+    type = deferred and callbackType.deferredChannelMessage or callbackType.channelMessage,
     data = payload
   }, files)
   if data then
@@ -193,10 +195,11 @@ end
 --[=[
 @m deleteReply
 @t http
-@p payload table/string
-@r Message
-@d Deletes a previously sent response. If `id` was not provided, original interaction response is deleted instead.
+@op id Message-ID-Resolvable
+@r boolean
+@d Deletes a previously sent response. If response `id` was not provided, original interaction response is deleted instead.
 
+Returns `true` on success, otherwise `false, err`.
 Note: **Ephemeral messages cannot be deleted once sent.**
 ]=]
 function Interaction:deleteReply(id)
@@ -207,7 +210,7 @@ end
 
 function Interaction:_sendUpdate(payload, files)
   local data, err = self._api:createInteractionResponse(self.id, self._token, {
-    type = payload and 7 or 6,
+    type = payload and callbackType.updateMessage or callbackType.deferredUpdateMessage,
     data = payload
   }, files)
   if data then
@@ -270,38 +273,39 @@ function get.type(self)
   return self._type
 end
 
---[=[@p guildId string/nil A snowflake ID of the guild the interaction was made in if any.]=]
+--[=[@p guildId string/nil The Snowflake ID of the guild the interaction happened at, if any.]=]
 function get.guildId(self)
   return self._guild_id
 end
 
---[=[@p guild Guild/nil The guild object of self.guildId if any.]=]
+--[=[@p guild Guild/nil The Guild object the interaction happened at. Equivalent to `Client:getGuild(Interaction.guildId)`.]=]
 function get.guild(self)
   return self._guild
 end
 
---[=[@p channelId string A snowflake ID of the channel the interaction was made in.
-Should always be provided, but keep in mind Discord flag it as optional for future-proofing.]=]
+--[=[@p channelId string The Snowflake ID of the channel the interaction was made at.
+Should always be provided, but keep in mind Discord flags it as optional for future-proofing.]=]
 function get.channelId(self)
   return self._channel_id
 end
 
---[=[@p channel channel/nil The channel object of self.channelId.]=]
+--[=[@p channel channel/nil The Channel object the interaction exists at.
+Equivalent to `Client:getChannel(Interaction.channelId)`.]=]
 function get.channel(self)
   return self._channel
 end
 
---[=[@p message message/nil The message the interaction was used on. Currently only for components-based interactions.]=]
+--[=[@p message message/nil The message the interaction was attached to. Currently only provided for components-based interactions.]=]
 function get.message(self)
   return self._message
 end
 
---[=[@p member member/nil The member who made the interaction if it was in guild.]=]
+--[=[@p member member/nil The member who interacted with the application in a guild.]=]
 function get.member(self)
   return self._member
 end
 
---[=[@p user member The user who made the interaction, should exists always.]=]
+--[=[@p user user The User object of who interacted with the application, should always be available.]=]
 function get.user(self)
   return self._user
 end
@@ -312,12 +316,12 @@ function get.data(self)
 end
 
 --[=[@p token string The interaction token. What allows you to responds to a specific interaction.
-This is a secret and shouldn't be exposed, if leaked anyone can send messages on behalf of your bot]=]
+This is a secret and shouldn't be exposed, if leaked anyone can send messages on behalf of your bot.]=]
 function get.token(self)
   return self._token
 end
 
---[=[@p version string The interaction version. (aka not useful at all)]=]
+--[=[@p version string The interaction version. (Currently not useful at all)]=]
 function get.version(self)
   return self._version
 end

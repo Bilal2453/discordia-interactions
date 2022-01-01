@@ -6,6 +6,15 @@ enums.interactionType = {
   messageComponent    = 3,
 }
 
+enums.interactionCallbackType = {
+  pong                                  = 1,
+  channelMessage                        = 4,
+  deferredChannelMessage                = 5,
+  deferredUpdateMessage                 = 6,
+  updateMessage                         = 7,
+  applicationCommandAutocompleteResult  = 8,
+}
+
 enums.appCommandType = {
   chatInput = 1,
   user      = 2,
@@ -36,20 +45,7 @@ enums.componentType = {
   selectMenu  = 3,
 }
 
-enums.buttonStyle = {
-  primary   = 1,
-  secondary = 2,
-  success   = 3,
-  danger    = 4,
-  link      = 5,
-}
-
 enums.messageFlag = {
-	crossposted           = 0x00000001,
-	isCrosspost           = 0x00000002,
-	suppressEmbeds        = 0x00000004,
-	sourceMessageDeleted  = 0x00000008,
-	urgent                = 0x00000010,
   hasThread             = 0x00000020,
   ephemeral             = 0x00000040,
   loading               = 0x00000080,

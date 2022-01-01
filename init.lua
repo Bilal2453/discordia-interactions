@@ -19,29 +19,52 @@ local EventHandler = require("client/EventHandler")
 local enums = require("enums")
 local API = require("client/API")
 
--- Patch Discordia's event handler to include Interactions listening
+-- Patch Discordia's enums to include some of the missing fields
 do
-  local client = discordia.Client() -- tmp client object to easily patch some properties
+  local discordia_enums = discordia.enums
+  local enum = discordia_enums.enum
+  for k, v in pairs(enums) do
+    if not discordia_enums[k] then -- compatibility with other extensions provided enums
+      discordia_enums[k] = enum(v)
+    else
+      local new_enum = v
+      for n, m in pairs(discordia_enums[k]) do
+        if not new_enum[n] then
+          new_enum[n] = m
+        end
+      end
+      discordia_enums[k] = enum(new_enum)
+    end
+  end
+end
+
+-- Patch Discordia's API wrapper to include some of the missing endpoints
+-- Do note, one major patch (that should affect nothing) is of API.editMessage, was patched to include files support.
+do
+  local discordia_api = discordia.class.classes.API
+  API.request = discordia_api.request
+  for k, v in pairs(API) do
+    rawset(discordia_api, k, v)
+  end
+end
+
+-- Patch Discordia's event handler to add interactionCreate event
+do
+  local client = discordia.Client() -- tmp client object to quickly patch events
   local events = client._events
   for k, v in pairs(EventHandler) do
-    events[k] = v
+    if rawget(events, k) then -- compatiblity with other libraries
+      local old_event = events[k]
+      events[k] = function(...)
+        v(...)
+        return old_event(...)
+      end
+    else
+      events[k] = v
+    end
   end
 end
 
--- Patch Discordia's enums to include interaction types
-do
-  local discordiaEnums = discordia.enums
-  local enum = discordiaEnums.enum
-  for k, v in pairs(enums) do
-    discordiaEnums[k] = enum(v)
-  end
-end
-
--- Patch Discordia's API wrapper to include some missing endpoints
-do
-  local api = discordia.class.classes.API
-  API.request = api.request
-  for k, v in pairs(API) do
-    rawset(api, k, v)
-  end
-end
+return {
+  Interaction = require("containers/Interaction"),
+}
