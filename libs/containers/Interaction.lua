@@ -66,12 +66,9 @@ function Interaction:__init(data, parent)
     if data.member and self._guild then
       self._member = self._guild._members:_insert(data.member)
       self._user = parent._users:_insert(data.member.user)
-      goto skip
-    end
-    if data.user then
+    elseif data.user then
       self._user = parent._users:_insert(data.user)
     end
-    ::skip::
   end
 
   -- Handle message
@@ -100,7 +97,7 @@ end
 function Interaction:_sendMessage(payload, files, deferred)
   local data, err = self._api:createInteractionResponse(self.id, self._token, {
     type = deferred and callbackType.deferredChannelMessage or callbackType.channelMessage,
-    data = payload
+    data = payload,
   }, files)
   if data then
     self._initialRes = true
@@ -132,7 +129,7 @@ function Interaction:reply(content, isEphemeral)
   isEphemeral = isEphemeral and true or type(content) == "table" and content.ephemeral
   local msg, files = parseMessage(content)
 
-  -- Handle ephemeral flags setting
+  -- Handle flag masking
   if isEphemeral then
     msg.flags = bor(type(msg.flags) == "number" or 0, messageFlag.ephemeral)
   end
@@ -159,6 +156,7 @@ A deferred reply displays "Bot is thinking..." to users, and once `:reply` is ca
 Returns `true` on success, otherwise `false, err`.
 ]=]
 function Interaction:replyDeferred(isEphemeral)
+  assert(not self._initialRes, "only the initial response can be deferred")
   local msg = isEphemeral and {flags = messageFlag.ephemeral} or nil
   return self:_sendMessage(msg, nil, true)
 end
@@ -214,7 +212,7 @@ end
 function Interaction:_sendUpdate(payload, files)
   local data, err = self._api:createInteractionResponse(self.id, self._token, {
     type = payload and callbackType.updateMessage or callbackType.deferredUpdateMessage,
-    data = payload
+    data = payload,
   }, files)
   if data then
     self._initialRes = true
@@ -230,39 +228,39 @@ end
 @t http
 @p content table/string
 @r boolean
-@d Responds to a component-based interaction by modifying the original bot's message the components were attached to.
+@d Responds to a component-based interaction by editing the message that the component is attached to.
 
 Returns `true` on success, otherwise `false, err`.
 ]=]
 function Interaction:update(content)
   assert(self._message, "UPDATE_MESSAGE is only supported by components-based interactions!")
+  assert(content, "bad argument #2 to update (expected table|string)")
   local msg, files = parseMessage(content)
-  if not msg and not self._initialRes then
-    return self:_sendUpdate()
-  end
-  if self._initialRes then
-    local data, err = self._api:editMessage(self._message._parent._id, self._message._id, msg, files)
-    if data then
-      self._message:_setOldContent(data)
-      self._message:_load(data)
-      return true
-    end
-    return false, err
-  else
+  if not self._initialRes then
+    print(1, msg)
     return self:_sendUpdate(msg, files)
   end
+  local data, err = self._api:editMessage(self._message._parent._id, self._message._id, msg, files)
+  if data then
+    self._message:_setOldContent(data)
+    self._message:_load(data)
+    return true
+  end
+  return false, err
 end
 
 --[=[
 @m updateDeferred
 @t http
 @r boolean
-@d Responds to a component-based interaction by acknowledging the interaction,
-where the next used `reply`/`update` methods will update the original bot message.
+@d Responds to a component-based interaction by acknowledging the interaction.
+Once `update` is called, the components message will be edited.
 
 Returns `true` on success, otherwise `false, err`.
 ]=]
 function Interaction:updateDeferred()
+  assert(self._message, "DEFERRED_UPDATE_MESSAGE is only supported by components-based interactions!")
+  assert(not self._initialRes, "only the initial response can be deferred")
   return self:_sendUpdate()
 end
 
