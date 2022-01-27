@@ -50,7 +50,9 @@ end
 
 -- Patch Discordia's event handler to add interactionCreate event
 do
-  local client = discordia.Client() -- tmp client object to quickly patch events
+  local client = discordia.Client { -- tmp client object to quickly patch events
+    logFile = '', -- do not create a log file
+  }
   local events = client._events
   for k, v in pairs(EventHandler) do
     if rawget(events, k) then -- compatiblity with other libraries
