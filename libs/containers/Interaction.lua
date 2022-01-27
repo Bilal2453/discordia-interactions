@@ -233,11 +233,11 @@ end
 Returns `true` on success, otherwise `false, err`.
 ]=]
 function Interaction:update(content)
+  local t = type(content)
   assert(self._message, "UPDATE_MESSAGE is only supported by components-based interactions!")
-  assert(content, "bad argument #2 to update (expected table|string)")
+  assert(t == "string" or t == "table", "bad argument #2 to update (expected table|string)")
   local msg, files = parseMessage(content)
   if not self._initialRes then
-    print(1, msg)
     return self:_sendUpdate(msg, files)
   end
   local data, err = self._api:editMessage(self._message._parent._id, self._message._id, msg, files)
