@@ -1,9 +1,10 @@
 local enums = {}
 
 enums.interactionType = {
-  ping                = 1,
-  applicationCommand  = 2,
-  messageComponent    = 3,
+  ping                            = 1,
+  applicationCommand              = 2,
+  messageComponent                = 3,
+  applicationCommandAutocomplete  = 4,
 }
 
 enums.interactionCallbackType = {
@@ -46,9 +47,9 @@ enums.componentType = {
 }
 
 enums.messageFlag = {
-  hasThread             = 0x00000020,
-  ephemeral             = 0x00000040,
-  loading               = 0x00000080,
+  hasThread = 0x00000020,
+  ephemeral = 0x00000040,
+  loading   = 0x00000080,
 }
 
 return enums
