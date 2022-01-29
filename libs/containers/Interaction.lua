@@ -15,6 +15,7 @@ local bit = require("bit")
 local bor = bit.bor
 local class = discordia.class
 local classes = class.classes
+local intrType = enums.interactionType
 local Snowflake = classes.Snowflake
 local messageFlag = enums.messageFlag
 local parseMessage = ported.parseMessage
@@ -262,6 +263,27 @@ function Interaction:updateDeferred()
   assert(self._message, "DEFERRED_UPDATE_MESSAGE is only supported by components-based interactions!")
   assert(not self._initialRes, "only the initial response can be deferred")
   return self:_sendUpdate()
+end
+
+function Interaction:autocomplete(choices)
+  assert(self._type == intrType.applicationCommandAutocomplete, "APPLICATION_COMMAND_AUTOCOMPLETE is only supported by application-based commands!")
+  assert(type(choices) == "table", 'bad argument #1 to autocomplete (expected table)')
+  -- TODO: may consider a choices resolver?
+  if choices.name and choices.value then
+    choices = {choices}
+  end
+  -- TODO: Check if you can send empty choices, if not add assertion for it
+  assert(#choices < 26, 'choices must not exceeds 25 choice')
+  local data, err = self._api:createInteractionResponse(self.id, self._token, {
+    type = callbackType.applicationCommandAutocompleteResult,
+    choices = choices,
+  })
+  -- TODO: check callback returns
+  if data then
+    return true
+  else
+    return false, err
+  end
 end
 
 --[=[@p applicationId string A unique snowflake ID of the application.]=]
