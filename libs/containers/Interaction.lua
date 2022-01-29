@@ -272,11 +272,12 @@ function Interaction:autocomplete(choices)
   if choices.name and choices.value then
     choices = {choices}
   end
-  -- TODO: Check if you can send empty choices, if not add assertion for it
   assert(#choices < 26, 'choices must not exceeds 25 choice')
   local data, err = self._api:createInteractionResponse(self.id, self._token, {
     type = callbackType.applicationCommandAutocompleteResult,
-    choices = choices,
+    data = {
+      choices = choices,
+    },
   })
   -- TODO: check callback returns
   if data then
