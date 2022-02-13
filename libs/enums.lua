@@ -5,6 +5,7 @@ enums.interactionType = {
   applicationCommand              = 2,
   messageComponent                = 3,
   applicationCommandAutocomplete  = 4,
+  modalSubmit                     = 5,
 }
 
 enums.interactionCallbackType = {
@@ -14,6 +15,7 @@ enums.interactionCallbackType = {
   deferredUpdateMessage                 = 6,
   updateMessage                         = 7,
   applicationCommandAutocompleteResult  = 8,
+  modal                                 = 9,
 }
 
 enums.appCommandType = {
@@ -33,6 +35,7 @@ enums.appCommandOptionType = {
   role            = 8,
   mentionable     = 9,
   number          = 10,
+  attachment      = 11,
 }
 
 enums.appCommandPermissionType = {
@@ -44,6 +47,7 @@ enums.componentType = {
   actionRow   = 1,
   button      = 2,
   selectMenu  = 3,
+  textInput   = 4,
 }
 
 enums.messageFlag = {

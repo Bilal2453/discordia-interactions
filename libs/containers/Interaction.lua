@@ -279,7 +279,6 @@ function Interaction:autocomplete(choices)
       choices = choices,
     },
   })
-  -- TODO: check callback returns
   if data then
     return true
   else
@@ -353,6 +352,11 @@ end
 --[=[@p locale string The user's client language and locale.]=]
 function get:locale()
   return self._locale
+end
+
+--[=[@p guildLocale string The guild's preferred locale, if said interaction was executed in one.]=]
+function get:guildLocale()
+  return self._guild_locale
 end
 
 return Interaction
