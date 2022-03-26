@@ -40,7 +40,7 @@ end
 local blacklisted_fields = {
   content = true, code = true, mention = true,
   mentions = true, file = true, files = true,
-  reference = true, payload_json = true,
+  reference = true, payload_json = true, embed = true,
 }
 
 local function parseMessage(content)
@@ -75,6 +75,14 @@ local function parseMessage(content)
     if mentions then
       table.insert(mentions, content)
       content = table.concat(mentions, ' ')
+    end
+
+    if tbl.embed then
+      if type(tbl.embeds) == 'table' then
+        tbl.embeds[#tbl.embeds + 1] = tbl.embed
+      elseif tbl.embeds == nil then
+        tbl.embeds = {tbl.embed}
+      end
     end
 
     local files

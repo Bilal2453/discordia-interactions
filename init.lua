@@ -69,4 +69,5 @@ end
 
 return {
   Interaction = require("containers/Interaction"),
+  parseMessage = require("ported").parseMessage,
 }
