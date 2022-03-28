@@ -1,6 +1,5 @@
 local discordia = require("discordia")
 local resolver = require("client/resolver")
-local ported = require("ported")
 local enums = require("enums")
 local bit = require("bit")
 
@@ -10,7 +9,7 @@ local classes = class.classes
 local intrType = enums.interactionType
 local Snowflake = classes.Snowflake
 local messageFlag = enums.messageFlag
-local parseMessage = ported.parseMessage
+local resolveMessage = resolver.message
 local callbackType = enums.interactionCallbackType
 local channelType = discordia.enums.channelType
 
@@ -141,7 +140,7 @@ end
 ---@return boolean|Message
 function Interaction:reply(content, isEphemeral)
   isEphemeral = isEphemeral and true or type(content) == "table" and content.ephemeral
-  local msg, files = parseMessage(content)
+  local msg, files = resolveMessage(content)
 
   -- Handle flag masking
   if isEphemeral then
@@ -192,7 +191,7 @@ end
 ---@return Message
 function Interaction:editReply(content, id)
   id = resolver.messageId(id) or self._message.id
-  local msg, files = parseMessage(content)
+  local msg, files = resolveMessage(content)
   local data, err = self._api:editWebhookMessage(self._application_id, self._token, id, msg, files)
   return data and true, err
 end
@@ -232,7 +231,7 @@ function Interaction:update(content)
   local t = type(content)
   assert(self._message, "UPDATE_MESSAGE is only supported by components-based interactions!")
   assert(t == "string" or t == "table", "bad argument #2 to update (expected table|string)")
-  local msg, files = parseMessage(content)
+  local msg, files = resolveMessage(content)
   if not self._initialRes then
     return self:_sendUpdate(msg, files)
   end

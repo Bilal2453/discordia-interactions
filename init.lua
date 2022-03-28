@@ -1,5 +1,7 @@
 --[[
-  Copyright 2021 Bilal2453
+                          Apache License 2.0
+
+   Copyright 2022 Bilal2453
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -69,5 +71,5 @@ end
 
 return {
   Interaction = require("containers/Interaction"),
-  parseMessage = require("ported").parseMessage,
+  resolver = require("client/resolver"),
 }
