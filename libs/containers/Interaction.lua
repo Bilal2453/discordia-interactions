@@ -7,7 +7,7 @@ allowing you to respond and reply to user interactions.
 ]=]
 
 local discordia = require("discordia")
-local Resolver = require("client/Resolver")
+local resolver = require("client/resolver")
 local ported = require("ported")
 local enums = require("enums")
 local bit = require("bit")
@@ -172,7 +172,7 @@ end
 Note: **Ephemeral messages cannot be retrieved once sent.**
 ]=]
 function Interaction:getReply(id)
-  id = Resolver.messageId(id) or "@original"
+  id = resolver.messageId(id) or "@original"
   local data, err = self._api:getWebhookMessage(self._application_id, self._token, id)
   return data and self._channel._messages:_insert(data), err
 end
@@ -188,7 +188,7 @@ end
 Note: **Ephemeral messages cannot be modified once sent.**
 ]=]
 function Interaction:editReply(content, id)
-  id = Resolver.messageId(id) or self._message.id
+  id = resolver.messageId(id) or self._message.id
   local msg, files = parseMessage(content)
   local data, err = self._api:editWebhookMessage(self._application_id, self._token, id, msg, files)
   return data and true, err
@@ -205,7 +205,7 @@ Returns `true` on success, otherwise `false, err`.
 Note: **Ephemeral messages cannot be deleted once sent.**
 ]=]
 function Interaction:deleteReply(id)
-  id = Resolver.messageId(id) or "@original"
+  id = resolver.messageId(id) or "@original"
   local data, err = self._api:deleteWebhookMessage(self._application_id, self._token, id)
   return data and true, err
 end

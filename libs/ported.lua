@@ -6,7 +6,7 @@
 --]]
 
 local fs = require("fs")
-local Resolver = require("client/Resolver")
+local resolver = require("client/resolver")
 local splitPath = require("pathjoin").splitPath
 
 local function parseFile(obj, files)
@@ -103,7 +103,7 @@ local function parseMessage(content)
 
     local refMessage, refMention
     if tbl.reference then
-      refMessage = {message_id = Resolver.messageId(tbl.reference.message)}
+      refMessage = {message_id = resolver.messageId(tbl.reference.message)}
       refMention = {
         parse = {"users", "roles", "everyone"},
         replied_user = not not tbl.reference.mention,
