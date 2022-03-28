@@ -1,11 +1,3 @@
---[=[
-@c Interaction x Snowflake
-@p data table
-@p parent Client
-@d Represents a [Discord Interaction](https://discord.com/developers/docs/interactions/receiving-and-responding#interactions)
-allowing you to respond and reply to user interactions.
-]=]
-
 local discordia = require("discordia")
 local resolver = require("client/resolver")
 local ported = require("ported")
@@ -22,7 +14,29 @@ local parseMessage = ported.parseMessage
 local callbackType = enums.interactionCallbackType
 local channelType = discordia.enums.channelType
 
+---Represents a [Discord Interaction](https://discord.com/developers/docs/interactions/receiving-and-responding#interactions)
+---allowing you to respond and reply to user interactions.
+---@class Interaction: Snowflake
+---@type fun(data: table, parent: Client): Interaction
+---@field applicationId string The application's unique snowflake ID.
+---@field type number The Interaction's type, see interactionType enum for info.
+---@field guildId string? The Snowflake ID of the guild the interaction happened at, if any.
+---@field guild Guild? The Guild object the interaction happened at. Equivalent to `Client:getGuild(Interaction.guildId)`.
+---@field channelId string The Snowflake ID of the channel the interaction was made at. Should always be provided, but keep in mind Discord flags it as optional for future-proofing.
+---@field channel channel? The Channel object the interaction exists at. Equivalent to `Client:getChannel(Interaction.channelId)`. Can be `GuildTextChannel` or `PrivateChannel`.
+---@field message message? The message the interaction was attached to. Currently only provided for components-based interactions.
+---@field member member? The member who interacted with the application in a guild.
+---@field user user? The User object of who interacted with the application, should always be available..
+---@field data table The raw data of the interaction. See [Interaction Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-resolved-data-structure).
+---@field token string The interaction token. What allows you to responds to a specific interaction. This is a secret and shouldn't be exposed, if leaked anyone can send messages on behalf of your bot.
+---@field version string The interaction version. (Currently not useful at all)
+---@field locale string The locale settings of the user who executed this interaction.
+---@field guildLocale string The guild's preferred locale, if said interaction was executed in a guild.
+---<!method-tags:http>
 local Interaction, get = class("Interaction", Snowflake)
+
+---@type table
+local getter = get
 
 function Interaction:__init(data, parent)
   Snowflake.__init(self, data, parent)
@@ -114,18 +128,17 @@ function Interaction:_sendFollowup(payload, files)
   return data and self._channel._messages:_insert(data), err
 end
 
---[=[
-@m reply
-@t http
-@p content string/table
-@op isEphemeral boolean
-@r TODO
-@d Sends an interaction reply. An initial response is sent on first call of this,
-if an initial response was already sent a followup message is sent instead.
-If initial response was a deferred response, calling this will properly edit the deferred message.
-
-Returns may not be consistent because blame Discord.
-]=]
+---Sends an interaction reply. An initial response is sent on first call of this,
+---if an initial response was already sent a followup message is sent instead.
+---If initial response was a deferred response, calling this will properly edit the deferred message.
+---
+---Returns may not be consistent because blame Discord.
+---On initial response, expect this to return a boolean value representing success otherwise `false, err`.
+---To get the sent reply in that case use `Interaction:getReply()`.
+---On followups and edits, this will return the sent/edited message, otherwise `false, err`.
+---@param content string|table
+---@param isEphemeral? boolean
+---@return boolean|Message
 function Interaction:reply(content, isEphemeral)
   isEphemeral = isEphemeral and true or type(content) == "table" and content.ephemeral
   local msg, files = parseMessage(content)
@@ -142,51 +155,41 @@ function Interaction:reply(content, isEphemeral)
   else
     method = self._sendMessage
   end
-  return method(self, msg, files) -- TODO: make sure returns are consistent, or it's fine like this?
+  return method(self, msg, files)
 end
 
---[=[
-@m replyDeferred
-@t http
-@op isEphemeral boolean
-@r boolean
-@d Sends a deferred interaction reply.
-Deferred replies can only be sent as initial responses.
-A deferred reply displays "Bot is thinking..." to users, and once `:reply` is called again, deferred message will be edited.
-
-Returns `true` on success, otherwise `false, err`.
-]=]
+---Sends a deferred interaction reply.
+---Deferred replies can only be sent as initial responses.
+---A deferred reply displays "Bot is thinking..." to users, and once `:reply` is called again, deferred message will be edited.
+---
+---Returns `true` on success, otherwise `false, err`.
+---@param isEphemeral? boolean
+---@return boolean
 function Interaction:replyDeferred(isEphemeral)
   assert(not self._initialRes, "only the initial response can be deferred")
   local msg = isEphemeral and {flags = messageFlag.ephemeral} or nil
   return self:_sendMessage(msg, nil, true)
 end
 
---[=[
-@m getReply
-@t http
-@op id Message-ID-Resolvable
-@r Message
-@d Fetches a previously sent interaction response. If response `id` was not provided, the original interaction response is fetched instead.
+---@alias Message-ID-Resolvable table
 
-Note: **Ephemeral messages cannot be retrieved once sent.**
-]=]
+---Fetches a previously sent interaction response. If response `id` was not provided, the original interaction response is fetched instead.
+---
+---Note: **Ephemeral messages cannot be retrieved once sent.**
+---@param id? Message-ID-Resolvable
+---@return Message
 function Interaction:getReply(id)
   id = resolver.messageId(id) or "@original"
   local data, err = self._api:getWebhookMessage(self._application_id, self._token, id)
   return data and self._channel._messages:_insert(data), err
 end
 
---[=[
-@m editReply
-@t http
-@p content table/string
-@op id Message-ID-Resolvable
-@r Message
-@d Modifies a previously sent interaction response. If response `id` was not provided, initial interaction response is edited instead.
-
-Note: **Ephemeral messages cannot be modified once sent.**
-]=]
+---Modifies a previously sent interaction response. If response `id` was not provided, initial interaction response is edited instead.
+---
+---Note: **Ephemeral messages cannot be modified once sent.**
+---@param content table|string
+---@param id? Message-ID-Resolvable
+---@return Message
 function Interaction:editReply(content, id)
   id = resolver.messageId(id) or self._message.id
   local msg, files = parseMessage(content)
@@ -194,16 +197,12 @@ function Interaction:editReply(content, id)
   return data and true, err
 end
 
---[=[
-@m deleteReply
-@t http
-@op id Message-ID-Resolvable
-@r boolean
-@d Deletes a previously sent response. If response `id` was not provided, original interaction response is deleted instead.
-
-Returns `true` on success, otherwise `false, err`.
-Note: **Ephemeral messages cannot be deleted once sent.**
-]=]
+---Deletes a previously sent response. If response `id` was not provided, original interaction response is deleted instead.
+---
+---Returns `true` on success, otherwise `false, err`.
+---Note: **Ephemeral messages cannot be deleted once sent.**
+---@param id? Message-ID-Resolvable
+---@return boolean
 function Interaction:deleteReply(id)
   id = resolver.messageId(id) or "@original"
   local data, err = self._api:deleteWebhookMessage(self._application_id, self._token, id)
@@ -224,15 +223,11 @@ function Interaction:_sendUpdate(payload, files)
   end
 end
 
---[=[
-@m update
-@t http
-@p content table/string
-@r boolean
-@d Responds to a component-based interaction by editing the message that the component is attached to.
-
-Returns `true` on success, otherwise `false, err`.
-]=]
+---Responds to a component-based interaction by editing the message that the component is attached to.
+---
+---Returns `true` on success, otherwise `false, err`.
+---@param content table|string
+---@return boolean
 function Interaction:update(content)
   local t = type(content)
   assert(self._message, "UPDATE_MESSAGE is only supported by components-based interactions!")
@@ -250,21 +245,20 @@ function Interaction:update(content)
   return false, err
 end
 
---[=[
-@m updateDeferred
-@t http
-@r boolean
-@d Responds to a component-based interaction by acknowledging the interaction.
-Once `update` is called, the components message will be edited.
-
-Returns `true` on success, otherwise `false, err`.
-]=]
+---Responds to a component-based interaction by acknowledging the interaction.
+---Once `update` is called, the components message will be edited.
+---
+---Returns `true` on success, otherwise `false, err`.
+---@return boolean
 function Interaction:updateDeferred()
   assert(self._message, "DEFERRED_UPDATE_MESSAGE is only supported by components-based interactions!")
   assert(not self._initialRes, "only the initial response can be deferred")
   return self:_sendUpdate()
 end
 
+---WIP. Usage of this method may change in the future.
+---@param choices table
+---@return boolean
 function Interaction:autocomplete(choices)
   assert(self._type == intrType.applicationCommandAutocomplete, "APPLICATION_COMMAND_AUTOCOMPLETE is only supported by application-based commands!")
   assert(type(choices) == "table", 'bad argument #1 to autocomplete (expected table)')
@@ -286,76 +280,59 @@ function Interaction:autocomplete(choices)
   end
 end
 
---[=[@p applicationId string A unique snowflake ID of the application.]=]
-function get:applicationId()
+function getter:applicationId()
   return self._application_id
 end
 
---[=[@p type number The Interaction type, see interactionType enum.]=]
-function get:type()
+function getter:type()
   return self._type
 end
 
---[=[@p guildId string/nil The Snowflake ID of the guild the interaction happened at, if any.]=]
-function get:guildId()
+function getter:guildId()
   return self._guild_id
 end
 
---[=[@p guild Guild/nil The Guild object the interaction happened at. Equivalent to `Client:getGuild(Interaction.guildId)`.]=]
-function get:guild()
+function getter:guild()
   return self._guild
 end
 
---[=[@p channelId string The Snowflake ID of the channel the interaction was made at.
-Should always be provided, but keep in mind Discord flags it as optional for future-proofing.]=]
-function get:channelId()
+function getter:channelId()
   return self._channel_id
 end
 
---[=[@p channel channel/nil The Channel object the interaction exists at.
-Equivalent to `Client:getChannel(Interaction.channelId)`.]=]
-function get:channel()
+function getter:channel()
   return self._channel
 end
 
---[=[@p message message/nil The message the interaction was attached to. Currently only provided for components-based interactions.]=]
-function get:message()
+function getter:message()
   return self._message
 end
 
---[=[@p member member/nil The member who interacted with the application in a guild.]=]
-function get:member()
+function getter:member()
   return self._member
 end
 
---[=[@p user user The User object of who interacted with the application, should always be available.]=]
-function get:user()
+function getter:user()
   return self._user
 end
 
---[=[@p data table The raw data of the interaction. See [Interaction Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-resolved-data-structure)]=]
-function get:data()
+function getter:data()
   return self._data
 end
 
---[=[@p token string The interaction token. What allows you to responds to a specific interaction.
-This is a secret and shouldn't be exposed, if leaked anyone can send messages on behalf of your bot.]=]
-function get:token()
+function getter:token()
   return self._token
 end
 
---[=[@p version string The interaction version. (Currently not useful at all)]=]
-function get:version()
+function getter:version()
   return self._version
 end
 
---[=[@p locale string The user's client language and locale.]=]
-function get:locale()
+function getter:locale()
   return self._locale
 end
 
---[=[@p guildLocale string The guild's preferred locale, if said interaction was executed in one.]=]
-function get:guildLocale()
+function getter:guildLocale()
   return self._guild_locale
 end
 

@@ -2,7 +2,7 @@
 The MIT License (MIT)
 
 Copyright (c) 2016-2021 SinisterRectus
-Copyright (c) 2021-2021 Bilal2453 (Added new tag, change some behavior)
+Copyright (c) 2021-2022 Bilal2453 (heavily modified to partially support EmmyLua)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -59,64 +59,133 @@ local function gmatch(s, pattern, hash) -- only useful for one capture
 	return tbl
 end
 
-local function matchType(s)
-	return s:match('^@(%S+)')
+local function matchType(c)
+	local line
+	for _, s in ipairs(c) do
+		if s:find '<!ignore>' then return 'ignore' end
+	end
+	for _, s in ipairs(c) do
+		local m = s:match('%-%-%-%s*@(%S+)')
+		if m then line = m; break end
+	end
+	return line
 end
 
 local function matchComments(s)
-	return s:gmatch('--%[=%[%s*(.-)%s*%]=%]')
+	local lines = {}
+	local last_line = {}
+	for l in s:gmatch('[^\n]*\n?') do
+		if l:match '^%-%-' then
+			last_line[#last_line + 1] = l
+		elseif #last_line > 0 then
+			last_line[#last_line + 1] = l
+			lines[#lines+1] = last_line
+			last_line = {}
+		end
+	end
+	return lines
 end
 
 local function matchClassName(s)
-	return match(s, '@c (%S+)')
+	return match(s, '@class ([^%s:]+)')
 end
 
 local function matchMethodName(s)
-	return match(s, '@m (%S+)')
+	local m = s:match 'function%s*.-[:.]%s*([_%w]+)'
+		or s:match 'function%s*([_%w]+)'
+		or s:match '([_%w]+)%s*=%s*function'
+	if not m then error(s) end
+	return m
 end
 
-local function matchDescription(s)
-	return match(s, '@d (.+)')
+local function matchDescription(c)
+	local desc = {}
+	for _, v in ipairs(c) do
+		local n, m = v:match('%-%-%-*%s*@'), v:match('%-%-+%s*(.+)')
+		if not n and m then
+			m = m:gsub('<!.->', '') -- invisible custom tags
+			desc[#desc+1] = m
+		end
+	end
+	return table.concat(desc):gsub('^%s+', ''):gsub('%s+$', '')
 end
 
-local function matchParents(s)
-	return gmatch(s, 'x (%S+)')
-end
-
-local function matchReturns(s)
-	return gmatch(s, '@r (%S+)')
-end
-
-local function matchTags(s)
-	return gmatch(s, '@t (%S+)', true)
-end
-
-local function matchMethodTags(s)
-	return gmatch(s, '@mt (%S+)', true)
-end
-
-local function matchProperty(s)
-	local a, b, c = s:match('@p (%S+) (%S+) (.+)')
-	return {
-		name = assert(a, s),
-		type = assert(b, s),
-		desc = assert(c, s):gsub('%s+', ' '),
-	}
-end
-
-local function matchParameters(s)
+local function matchParents(c)
+	local line
+	for _, s in ipairs(c) do
+		local m = s:match('@class [%a_][%a_%-%.%*]+%s*:%s*([^\n#@%-]+)')
+		if m then line = m; break end
+	end
+	if not line then return {} end
 	local ret = {}
-	for optional, paramName, paramType in s:gmatch('@(o?)p (%S+) (%S+)') do
-		insert(ret, {paramName, paramType, optional == 'o'})
+	for s in line:gmatch('[^,]+') do
+		ret[#ret + 1] = s:match('%S+'):gsub('%s+', '')
 	end
 	return ret
 end
 
-local function matchMethod(s)
+local function matchReturns(s)
+	return gmatch(s, '@return (%S+)')
+end
+
+local function matchTags(s)
+	local ret = {}
+	for m in s:gmatch '<!tag%s*:%s*(.-)>' do
+		ret[m] = true
+	end
+	return ret
+end
+
+local function matchMethodTags(s)
+	local ret = {}
+	for m in s:gmatch '<!method%p?tags%s*:%s*(.-)>' do
+		ret[m] = true
+	end
+	return ret
+end
+
+local function matchProperties(s)
+	local ret = {}
+	for n, t, d in s:gmatch '@field%s*(%S+)%s*(%S+)%s*([^\n]*)' do
+		ret[#ret+1] = {
+			name = n,
+			type = t,
+			desc = d or '',
+		}
+	end
+	return ret
+end
+
+local function matchParameters(c)
+	local ret = {}
+	for _, s in ipairs(c) do
+		local param_name, optional, param_type = s:match('@param%s*([^%s%?]+)%s*(%??)%s*(%S+)')
+		if param_name then
+			ret[#ret+1] = {param_name, param_type, optional == '?'}
+		end
+	end
+	if #ret > 0 then return ret end
+
+	for _, s in ipairs(c) do
+		local params = s:match('@type%s*fun%s*%((.-)%)')
+		if not params then goto continue end
+		for pp in params:gmatch('[^,]+') do
+			local param_name, optional = pp:match('([%w_%-]+)%s*(%??)')
+			local param_type = pp:match(':%s*(.+)')
+			if param_name then
+				ret[#ret+1] = {param_name, param_type, optional == '?'}
+			end
+		end
+		::continue::
+	end
+	return ret
+end
+
+local function matchMethod(s, c)
 	return {
-		name = matchMethodName(s),
-		desc = matchDescription(s),
-		parameters = matchParameters(s),
+		name = matchMethodName(c[#c]),
+		desc = matchDescription(c),
+		parameters = matchParameters(c),
 		returns = matchReturns(s),
 		tags = matchTags(s),
 	}
@@ -131,16 +200,16 @@ local function newClass()
 	local class = {
 		methods = {},
 		statics = {},
-		properties = {},
 	}
 
-	local function init(s)
+	local function init(s, c)
 		class.name = matchClassName(s)
-		class.parents = matchParents(s)
-		class.desc = matchDescription(s)
-		class.parameters = matchParameters(s)
+		class.parents = matchParents(c)
+		class.desc = matchDescription(c)
+		class.parameters = matchParameters(c)
 		class.tags = matchTags(s)
 		class.methodTags = matchMethodTags(s)
+		class.properties = matchProperties(s)
 		assert(not docs[class.name], 'duplicate class: ' .. class.name)
 		docs[class.name] = class
 	end
@@ -150,26 +219,27 @@ local function newClass()
 end
 
 for f in coroutine.wrap(scan), './libs' do
-
 	local d = assert(fs.readFileSync(f))
 
 	local class, initClass = newClass()
-	for s in matchComments(d) do
-		local t = matchType(s)
-		if t == 'c' then
-			initClass(s)
-		elseif t == 'm' then
-			local method = matchMethod(s)
+	local comments = matchComments(d)
+	for i = 1, #comments do
+		local s = table.concat(comments[i], '\n')
+		local t = matchType(comments[i])
+		if t == 'ignore' then
+			goto continue
+		elseif t == 'class' then
+			initClass(s, comments[i])
+		elseif t == 'param' or t == 'return' then
+			local method = matchMethod(s, comments[i])
 			for k, v in pairs(class.methodTags) do
 				method.tags[k] = v
 			end
 			method.class = class
 			insert(method.tags.static and class.statics or class.methods, method)
-		elseif t == 'p' then
-			insert(class.properties, matchProperty(s))
 		end
+		::continue::
 	end
-
 end
 
 ----
@@ -184,9 +254,16 @@ local function link(str)
 		end
 		return concat(ret, ', ')
 	else
-		local ret = {}
-		for t in str:gmatch('[^/]+') do
+		local ret, optional = {}, false
+		if str:match('%?$') then
+			str = str:gsub('%?$', '')
+			optional = true
+		end
+		for t in str:gmatch('[^|]+') do
 			insert(ret, docs[t] and format('[[%s]]', t) or t)
+		end
+		if optional then
+			insert(ret, 'nil')
 		end
 		return concat(ret, '/')
 	end
@@ -219,9 +296,8 @@ local function writeParameters(f, parameters)
 			if i < #parameters then
 				f:write(', ')
 			end
-			if param[3] then
-				optional = true
-			end
+			optional = param[3]
+			param[2] = param[2]:gsub('|', '/')
 		end
 		f:write(')\n\n')
 		if optional then
@@ -299,7 +375,7 @@ end
 local function collectParents(parents, k, ret, seen)
 	ret = ret or {}
 	seen = seen or {}
-	for _, parent in ipairs(parents or {}) do
+	for _, parent in ipairs(parents) do
 		parent = docs[parent]
 		if parent then
 			for _, v in ipairs(parent[k]) do
@@ -309,7 +385,9 @@ local function collectParents(parents, k, ret, seen)
 				end
 			end
 		end
-		collectParents(parent and parent.parents, k, ret, seen)
+		if parent then
+			collectParents(parent.parents, k, ret, seen)
+		end
 	end
 	return ret
 end
@@ -327,15 +405,15 @@ for _, class in pairs(docs) do
 
 	f:write(class.desc, '\n\n')
 
-	checkTags(class.tags, {'ui', 'abc'})
-	if class.tags.ui then
+	checkTags(class.tags, {'interface', 'abstract', 'patch'})
+	if class.tags.interface then
 		writeHeading(f, 'Constructor')
 		f:write('### ', class.name)
 		writeParameters(f, class.parameters)
-	elseif class.tags.abc then
+	elseif class.tags.abstract then
 		f:write('*This is an abstract base class. Direct instances should never exist.*\n\n')
   elseif class.tags.patch then
-    f:write("*See Discordia Client for full documentations.\nOnly Patched methods and getters are documented here.*\n\n")
+    f:write("*This is a patched class.\nFor full usage refer to the Discordia Wiki, only patched methods and properities are documented here.*\n\n")
 	else
 		f:write('*Instances of this class should not be constructed by users.*\n\n')
 	end
