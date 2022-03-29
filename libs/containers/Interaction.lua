@@ -172,7 +172,8 @@ end
 
 ---@alias Message-ID-Resolvable table
 
----Fetches a previously sent interaction response. If response `id` was not provided, the original interaction response is fetched instead.
+---Fetches a previously sent interaction response.
+---If response `id` was not provided, the original interaction response is fetched instead.
 ---
 ---Note: **Ephemeral messages cannot be retrieved once sent.**
 ---@param id? Message-ID-Resolvable
@@ -183,7 +184,8 @@ function Interaction:getReply(id)
   return data and self._channel._messages:_insert(data), err
 end
 
----Modifies a previously sent interaction response. If response `id` was not provided, initial interaction response is edited instead.
+---Modifies a previously sent interaction response.
+---If response `id` was not provided, initial interaction response is edited instead.
 ---
 ---Note: **Ephemeral messages cannot be modified once sent.**
 ---@param content table|string
@@ -199,6 +201,7 @@ end
 ---Deletes a previously sent response. If response `id` was not provided, original interaction response is deleted instead.
 ---
 ---Returns `true` on success, otherwise `false, err`.
+---
 ---Note: **Ephemeral messages cannot be deleted once sent.**
 ---@param id? Message-ID-Resolvable
 ---@return boolean
@@ -255,13 +258,16 @@ function Interaction:updateDeferred()
   return self:_sendUpdate()
 end
 
----WIP. Usage of this method may change in the future.
+---Responds to an autocomplete interaction.
+---`choices` is either a table that has `name` and `value` fields, or an array of said tables.
+---For example: `{{name = "choice#1", value = "val1"}, {name = "choice#2", value = "val2"}}`.
+---
+---Returns `true` on success, otherwise `false, err`.
 ---@param choices table
 ---@return boolean
 function Interaction:autocomplete(choices)
   assert(self._type == intrType.applicationCommandAutocomplete, "APPLICATION_COMMAND_AUTOCOMPLETE is only supported by application-based commands!")
   assert(type(choices) == "table", 'bad argument #1 to autocomplete (expected table)')
-  -- TODO: may consider a choices resolver?
   if choices.name and choices.value then
     choices = {choices}
   end
