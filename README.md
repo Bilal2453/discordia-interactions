@@ -10,9 +10,9 @@ The library is documented at the [Wiki](https://github.com/Bilal2453/discordia-i
 
 Due to a bug in Lit, the Lit upstream version of this library won't install, you have to manually clone it.
 
-1. Run `git clone https://github.com/Bilal2453/discordia-interactions.git`.
-2. Make sure the cloned folder name is `discordia-interactions`.
-3. Move the `discordia-interactions` folder to your project `deps` folder. 
+1. Run `cd PATH` replace `PATH` with your bot's directory path. 
+2. Run `git clone https://github.com/Bilal2453/discordia-interactions.git ./deps/discordia-interactions`.
+3. Make sure you now have a folder `discordia-interactions` in your `deps` directory.
 
 # Examples
 
