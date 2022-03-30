@@ -90,6 +90,8 @@ local blacklisted_fields = {
   reference = true, payload_json = true, embed = true,
 }
 
+resolver.message_content_wrappers = {}
+
 function resolver.message(content)
   local err
   if type(content) == "table" then
@@ -166,6 +168,10 @@ function resolver.message(content)
       if not blacklisted_fields[k] then
         result[k] = v
       end
+    end
+
+    for _, v in pairs(resolver.message_content_wrappers) do
+      v(result, files)
     end
 
     return result, files
