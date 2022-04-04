@@ -285,6 +285,22 @@ function Interaction:autocomplete(choices)
   end
 end
 
+function Interaction:_sendModal(payload)
+  local data, err = self._api:createInteractionResponse(self.id, self._token, {
+    type = callbackType.modal,
+    data = payload,
+  })
+  if data then
+    return true
+  else
+    return false, err
+  end
+end
+
+function Interaction:modal(modal)
+  return self:_sendModal(modal)
+end
+
 function getter:applicationId()
   return self._application_id
 end
