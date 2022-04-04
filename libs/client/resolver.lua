@@ -84,16 +84,24 @@ function resolver.mention(obj, mentions)
   return mentions
 end
 
-local blacklisted_fields = {
+local message_blacklisted_fields = {
   content = true, code = true, mention = true,
   mentions = true, file = true, files = true,
   reference = true, payload_json = true, embed = true,
 }
 
-resolver.message_content_wrappers = {}
+resolver.message_resolvers = {}
+resolver.message_wrappers = {}
 
 function resolver.message(content)
   local err
+  for _, v in pairs(resolver.message_resolvers) do
+    local c = v(content)
+    if c then
+      content = c
+      break
+    end
+  end
   if type(content) == "table" then
     ---@type table
     local tbl = content
@@ -165,12 +173,12 @@ function resolver.message(content)
       allowed_mentions = tbl.allowed_mentions or refMention,
     }
     for k, v in pairs(tbl) do
-      if not blacklisted_fields[k] then
+      if not message_blacklisted_fields[k] then
         result[k] = v
       end
     end
 
-    for _, v in pairs(resolver.message_content_wrappers) do
+    for _, v in pairs(resolver.message_wrappers) do
       v(result, files)
     end
 
@@ -178,6 +186,42 @@ function resolver.message(content)
   else
     return {content = content}
   end
+end
+
+resolver.autocomplete_resolvers = {}
+resolver.autocomplete_wrappers = {}
+
+function resolver.autocomplete(choices)
+  for _, v in pairs(resolver.modal_resolvers) do
+    local c = v(choices)
+    if c then
+      choices = c
+      break
+    end
+  end
+  if type(choices) ~= "table" then return end
+  for _, v in pairs(resolver.modal_wrappers) do
+    v(choices)
+  end
+  return choices
+end
+
+resolver.modal_resolvers = {}
+resolver.modal_wrappers = {}
+
+function resolver.modal(content)
+  for _, v in pairs(resolver.modal_resolvers) do
+    local c = v(content)
+    if c then
+      content = c
+      break
+    end
+  end
+  if type(content) ~= "table" then return end
+  for _, v in pairs(resolver.modal_wrappers) do
+    v(content)
+  end
+  return content
 end
 
 return resolver

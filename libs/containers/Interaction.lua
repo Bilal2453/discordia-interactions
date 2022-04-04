@@ -267,6 +267,7 @@ end
 ---@return boolean
 function Interaction:autocomplete(choices)
   assert(self._type == intrType.applicationCommandAutocomplete, "APPLICATION_COMMAND_AUTOCOMPLETE is only supported by application-based commands!")
+  choices = resolver.autocomplete(choices)
   assert(type(choices) == "table", 'bad argument #1 to autocomplete (expected table)')
   if choices.name and choices.value then
     choices = {choices}
@@ -298,6 +299,7 @@ function Interaction:_sendModal(payload)
 end
 
 function Interaction:modal(modal)
+  modal = resolver.modal(modal)
   return self:_sendModal(modal)
 end
 
