@@ -217,7 +217,7 @@ function resolver.modal(content)
       break
     end
   end
-  if type(content) ~= "table" then return end
+  assert(type(content) == "table")
   for _, v in pairs(resolver.modal_wrappers) do
     v(content)
   end

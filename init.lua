@@ -70,6 +70,7 @@ do
 end
 
 return {
+  EventHandler = EventHandler,
   Interaction = require("containers/Interaction"),
   resolver = require("client/resolver"),
 }
