@@ -16,22 +16,22 @@ local channelType = discordia.enums.channelType
 ---Represents a [Discord Interaction](https://discord.com/developers/docs/interactions/receiving-and-responding#interactions)
 ---allowing you to respond and reply to user interactions.
 ---@class Interaction: Snowflake
----@type fun(data: table, parent: Client): Interaction
 ---@field applicationId string The application's unique snowflake ID.
 ---@field type number The Interaction's type, see interactionType enum for info.
 ---@field guildId string? The Snowflake ID of the guild the interaction happened at, if any.
 ---@field guild Guild? The Guild object the interaction happened at. Equivalent to `Client:getGuild(Interaction.guildId)`.
 ---@field channelId string The Snowflake ID of the channel the interaction was made at. Should always be provided, but keep in mind Discord flags it as optional for future-proofing.
----@field channel channel? The Channel object the interaction exists at. Equivalent to `Client:getChannel(Interaction.channelId)`. Can be `GuildTextChannel` or `PrivateChannel`.
----@field message message? The message the interaction was attached to. Currently only provided for components-based interactions.
----@field member member? The member who interacted with the application in a guild.
----@field user user? The User object of who interacted with the application, should always be available..
+---@field channel Channel? The Channel object the interaction exists at. Equivalent to `Client:getChannel(Interaction.channelId)`. Can be `GuildTextChannel` or `PrivateChannel`.
+---@field message Message? The message the interaction was attached to. Currently only provided for components-based interactions.
+---@field member Member? The member who interacted with the application in a guild.
+---@field user User? The User object of who interacted with the application, should always be available..
 ---@field data table The raw data of the interaction. See [Interaction Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-resolved-data-structure).
 ---@field token string The interaction token. What allows you to responds to a specific interaction. This is a secret and shouldn't be exposed, if leaked anyone can send messages on behalf of your bot.
 ---@field version string The interaction version. (Currently not useful at all)
 ---@field locale string The locale settings of the user who executed this interaction.
 ---@field guildLocale string The guild's preferred locale, if said interaction was executed in a guild.
 ---<!method-tags:http>
+---@type Interaction | fun(data: table, parent: Client): Interaction
 local Interaction, get = class("Interaction", Snowflake)
 
 ---@type table
@@ -144,7 +144,7 @@ function Interaction:reply(content, isEphemeral)
 
   -- Handle flag masking
   if isEphemeral then
-    msg.flags = bor(type(msg.flags) == "number" or 0, messageFlag.ephemeral)
+    msg.flags = bor(type(msg.flags) == "number" and msg.flags or 0, messageFlag.ephemeral)
   end
 
   -- Choose desired method depending on the context
