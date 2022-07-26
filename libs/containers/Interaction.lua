@@ -102,6 +102,7 @@ function Interaction:__init(data, parent)
       end
       self._message = cache and cache._messages:_insert(data.message)
     end
+    if not self._message then self._message = nil end
     ::skip::
   end
 
