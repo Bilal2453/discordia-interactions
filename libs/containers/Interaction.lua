@@ -47,7 +47,9 @@ function Interaction:__init(data, parent)
     self._guild = guildId and parent._guilds:get(guildId)
     if not self._guild and guildId then
       local guild = self._api:getGuild(guildId)
-      self._guild = parent._guilds:_insert(guild)
+      if guild then
+        self._guild = parent._guilds:_insert(guild)
+      end
     end
   end
 
