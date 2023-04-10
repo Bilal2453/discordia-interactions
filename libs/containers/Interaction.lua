@@ -127,6 +127,7 @@ end
 
 function Interaction:_sendFollowup(payload, files)
   local data, err = self._api:createWebhookMessage(self._application_id, self._token, payload, files)
+  if not self._channel then return data, err end
   return data and self._channel._messages:_insert(data), err
 end
 
