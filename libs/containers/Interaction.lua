@@ -127,7 +127,11 @@ end
 
 function Interaction:_sendFollowup(payload, files)
   local data, err = self._api:createWebhookMessage(self._application_id, self._token, payload, files)
-  return data and self._channel._messages:_insert(data), err
+  if data then
+    return self._channel and self._channel._messages:_insert(data) or true
+  else
+    return false, err
+  end
 end
 
 ---Sends an interaction reply. An initial response is sent on first call of this,
