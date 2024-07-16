@@ -65,9 +65,12 @@ function Interaction:__init(data, parent)
     -- Last resort, request the channel object from the API if wasn't cached
     if not self._channel then
       local channel = self._api:getChannel(channelId)
-      if not channel then goto skip end -- somehow channel not available
+      if not channel then goto skip end
 
       local guild = channel.guild and parent._guilds:_insert(channel.guild)
+      if channel.type == channelType.voice then
+        guild = parent:getGuild(channel.guild_id)
+      end
       if guild then
         self._channel = guild._text_channels:_insert(channel)
       elseif channel.type == channelType.private then
