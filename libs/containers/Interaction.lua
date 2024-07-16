@@ -68,7 +68,7 @@ function Interaction:__init(data, parent)
       if not channel then goto skip end
 
       local guild = channel.guild and parent._guilds:_insert(channel.guild)
-      if channel.type == channelType.voice then
+      if (not guild) and (channel.guild_id) then
         guild = parent:getGuild(channel.guild_id)
       end
       if guild then
