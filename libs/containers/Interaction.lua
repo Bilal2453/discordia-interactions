@@ -58,21 +58,38 @@ function Interaction:__init(data, parent)
     if not channelId then goto skip end
     -- First try retrieving it from cache
     if self._guild then
-      self._channel = self._guild._text_channels:get(channelId)
+      self._channel = self._guild:getChannel(channelId)
     elseif not data.guild_id then
       self._channel = parent._private_channels:get(channelId)
     end
-    -- Last resort, request the channel object from the API if wasn't cached
-    if not self._channel then
-      local channel = self._api:getChannel(channelId)
-      if not channel then goto skip end -- somehow channel not available
+    if self._channel then
+      goto skip
+    end
 
-      local guild = channel.guild and parent._guilds:_insert(channel.guild)
-      if guild then
-        self._channel = guild._text_channels:_insert(channel)
-      elseif channel.type == channelType.private then
-        self._channel = parent._private_channels:_insert(channel)
+    -- Last resort, request the channel object from the API if wasn't cached
+    local channel = self._api:getChannel(channelId)
+    if not channel then goto skip end -- somehow channel not available
+
+    if channel.guild_id then
+      local guild
+      if self._guild and channel.guild_id == self._guild.id then
+        guild = self._guild
+      else
+        local guild_data = self._api:getGuild(channel.guild_id)
+        if guild_data then
+          guild = parent._guilds:_insert(guild_data)
+        end
       end
+
+      if guild then
+        if channel.type == channelType.text then
+          self._channel = guild._text_channels:_insert(channel)
+        elseif channel.type == channelType.voice then
+          self._channel = guild._voice_channels:_insert(channel)
+        end
+      end
+    elseif channel.type == channelType.private then
+      self._channel = parent._private_channels:_insert(channel)
     end
     ::skip::
   end
