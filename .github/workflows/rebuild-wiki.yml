@@ -12,26 +12,28 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - run: echo ${{ github.repository }}
-
-      - run: echo $github.repository
+        with:
+          repository: '${{ github.repository }}.wiki'
+          path: 'wiki'
 
       - uses: actions/checkout@v4
         with:
-          repository: '${{ github.repository }}.wiki.git'
-          path: '/wiki'
+          path: 'repo'
 
       - name: Install Luvit
         run: curl -L https://github.com/luvit/lit/raw/master/get-lit.sh | sh
 
       - name: Generating wiki pages
-        run: ./luvit docgen.lua
+        run: |
+          cd repo
+          ../luvit docgen.lua
 
       - name: Updating wiki repo
         run: |
-          mv -f ./docs/* ./wiki/
-          cd ./wiki
+          mv -f $GITHUB_WORKSPACE/repo/docs/* $GITHUB_WORKSPACE/wiki/
+          cd $GITHUB_WORKSPACE/wiki
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m '$(git rev-parse --short --verify main)'
+          git commit -m "Rebuild for commit #$(git rev-parse --short --verify main)"
           git push
