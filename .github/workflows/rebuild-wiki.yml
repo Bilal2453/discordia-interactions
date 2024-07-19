@@ -1,0 +1,37 @@
+name: Rebuild Wiki
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: echo ${{ github.repository }}
+
+      - run: echo $github.repository
+
+      - uses: actions/checkout@v4
+        with:
+          repository: '${{ github.repository }}.wiki.git'
+          path: '/wiki'
+
+      - name: Install Luvit
+        run: curl -L https://github.com/luvit/lit/raw/master/get-lit.sh | sh
+
+      - name: Generating wiki pages
+        run: ./luvit docgen.lua
+
+      - name: Updating wiki repo
+        run: |
+          mv -f ./docs/* ./wiki/
+          cd ./wiki
+          git add .
+          git commit -m '$(git rev-parse --short --verify main)'
+          git push
