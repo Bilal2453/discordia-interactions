@@ -21,7 +21,7 @@ local channelType = discordia.enums.channelType
 ---@field guildId string? The Snowflake ID of the guild the interaction happened at, if any.
 ---@field guild Guild? The Guild object the interaction happened at. Equivalent to `Client:getGuild(Interaction.guildId)`.
 ---@field channelId string The Snowflake ID of the channel the interaction was made at. Should always be provided, but keep in mind Discord flags it as optional for future-proofing.
----@field channel Channel? The Channel object the interaction exists at. Equivalent to `Client:getChannel(Interaction.channelId)`. Can be `GuildTextChannel` or `PrivateChannel`.
+---@field channel Channel? The Channel object the interaction exists at. Equivalent to `Client:getChannel(Interaction.channelId)`. Can be `GuildTextChannel`, `GuildVoiceChannel` or `PrivateChannel`.
 ---@field message Message? The message the interaction was attached to. Currently only provided for components-based interactions.
 ---@field member Member? The member who interacted with the application in a guild.
 ---@field user User? The User object of who interacted with the application, should always be available..
