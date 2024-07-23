@@ -138,7 +138,7 @@ function Interaction:_sendMessage(payload, files, deferred)
     self._deferred = deferred or false
 
     if payload.flags and bit.band(payload.flags, messageFlag.ephemeral) ~= 0 then
-      -- message is ephemeral, therefore return true to indicate success because we can't reference the reply anyways
+      -- message is ephemeral, therefore return true to indicate success because we can't modify the reply later anyways
       return true
     else
       -- message is not ephemeral, therefore return reply so it can easily be used without having to manually get the reply
