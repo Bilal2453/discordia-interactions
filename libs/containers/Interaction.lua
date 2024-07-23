@@ -136,7 +136,14 @@ function Interaction:_sendMessage(payload, files, deferred)
   if data then
     self._initialRes = true
     self._deferred = deferred or false
-    return true
+
+    if payload.flags and bit.band(payload.flags, messageFlag.ephemeral) ~= 0 then
+      -- message is ephemeral, therefore return true to indicate success because we can't reference the reply anyways
+      return true
+    else
+      -- message is not ephemeral, therefore return reply so it can easily be used without having to manually get the reply
+      return self:getReply() or true
+    end
   else
     return false, err
   end
@@ -155,10 +162,7 @@ end
 ---if an initial response was already sent a followup message is sent instead.
 ---If initial response was a deferred response, calling this will properly edit the deferred message.
 ---
----Returns may not be consistent because blame Discord.
----On initial response, expect this to return a boolean value representing success otherwise `false, err`.
----To get the sent reply in that case use `Interaction:getReply()`.
----On followups and edits, this will return the sent/edited message, otherwise `false, err`.
+---On both the initial response, followups and edits, this will return the sent/edited message or a boolean value representing success, otherwise `false, err`.
 ---@param content string|table
 ---@param isEphemeral? boolean
 ---@return boolean|Message
