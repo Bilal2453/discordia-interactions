@@ -142,7 +142,7 @@ function Interaction:_sendMessage(payload, files, deferred)
       return true
     else
       -- message is not ephemeral, therefore return reply so it can easily be used without having to manually get the reply
-      return self:getReply() or true
+      return self:getReply()
     end
   else
     return false, err
