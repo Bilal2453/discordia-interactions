@@ -2,15 +2,15 @@
 	The code in this file is not injected into Discordia.
 	It is only used internally in this library.
 
-	Code below is taken from original Discordia source code and modified to work
-	for our usecase. This file is licensed under the Apache License 2.0.
+	Some of the code below was taken from original Discordia source code and modified to work
+	for our use-case. This file is licensed under the Apache License 2.0.
 --]]
 
 --[[
 													Apache License 2.0
 
-	Copyright (c) 2016-2022 SinisterRectus (Original author of Discordia)
-	Copyright (c) 2021-2022 Bilal2453 (Modified message resolver to support raw fields)
+	Copyright (c) 2016-2024 SinisterRectus
+	Copyright (c) 2021-2024 Bilal2453
 
 	Licensed under the Apache License, Version 2.0 (the "License");
 	you may not use this file except in compliance with the License.
@@ -192,7 +192,7 @@ resolver.autocomplete_resolvers = {}
 resolver.autocomplete_wrappers = {}
 
 function resolver.autocomplete(choices)
-  for _, v in pairs(resolver.modal_resolvers) do
+  for _, v in pairs(resolver.autocomplete_resolvers) do
     local c = v(choices)
     if c then
       choices = c
@@ -200,7 +200,7 @@ function resolver.autocomplete(choices)
     end
   end
   if type(choices) ~= "table" then return end
-  for _, v in pairs(resolver.modal_wrappers) do
+  for _, v in pairs(resolver.autocomplete_wrappers) do
     v(choices)
   end
   return choices

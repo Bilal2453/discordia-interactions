@@ -8,6 +8,12 @@ enums.interactionType = {
   modalSubmit                     = 5,
 }
 
+enums.interactionContextType = {
+  guild           = 1,
+  botDm           = 2,
+  privateChannel  = 3,
+}
+
 enums.interactionCallbackType = {
   pong                                  = 1,
   channelMessage                        = 4,
@@ -16,6 +22,8 @@ enums.interactionCallbackType = {
   updateMessage                         = 7,
   applicationCommandAutocompleteResult  = 8,
   modal                                 = 9,
+  premiumRequired                       = 10, -- deprecated
+  launchActivity                        = 12,
 }
 
 enums.appCommandType = {

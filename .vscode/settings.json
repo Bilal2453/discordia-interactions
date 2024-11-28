@@ -13,14 +13,8 @@
   "Lua.workspace.library": [
     "../deps",
     "../libs",
-    "${3rd}/Luvit/library"
+    "${addons}/luvit/module/library"
   ],
-  "Lua.runtime.builtin": {
-    "basic": "disable",
-    "package": "disable",
-    "string": "disable",
-    "table": "disable"
-  },
   "Lua.diagnostics.globals": [
     "p",
     "args"

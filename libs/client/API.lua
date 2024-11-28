@@ -12,7 +12,7 @@ local endpoints = {
 
 function API:createInteractionResponse(id, token, payload, files)
   local endpoint = f(endpoints.INTERACTION_CALLBACK, id, token)
-  return self:request("POST", endpoint, payload, nil, files)
+  return self:request("POST", endpoint, payload, {with_response = true}, files)
 end
 
 function API:createWebhookMessage(id, token, payload, files) -- same as executeWebhook but allows files

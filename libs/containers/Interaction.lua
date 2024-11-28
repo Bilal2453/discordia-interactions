@@ -1,3 +1,19 @@
+--[[
+  Copyright 2021-2024 Bilal2453
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+]]
+
 local discordia = require("discordia")
 local resolver = require("client/resolver")
 local enums = require("enums")
@@ -8,28 +24,32 @@ local class = discordia.class
 local classes = class.classes
 local intrType = enums.interactionType
 local Snowflake = classes.Snowflake
-local messageFlag = enums.messageFlag
+local Permissions = discordia.Permissions
+local messageFlag = assert(enums.messageFlag)
 local resolveMessage = resolver.message
 local callbackType = enums.interactionCallbackType
 local channelType = discordia.enums.channelType
 
 ---Represents a [Discord Interaction](https://discord.com/developers/docs/interactions/receiving-and-responding#interactions)
----allowing you to respond and reply to user interactions.
+---allowing you to receive and respond to user interactions.
 ---@class Interaction: Snowflake
 ---@field applicationId string The application's unique snowflake ID.
----@field type number The Interaction's type, see interactionType enum for info.
----@field guildId string? The Snowflake ID of the guild the interaction happened at, if any.
----@field guild Guild? The Guild object the interaction happened at. Equivalent to `Client:getGuild(Interaction.guildId)`.
----@field channelId string The Snowflake ID of the channel the interaction was made at. Should always be provided, but keep in mind Discord flags it as optional for future-proofing.
----@field channel Channel? The Channel object the interaction exists at. Equivalent to `Client:getChannel(Interaction.channelId)`. Can be `GuildTextChannel`, `GuildVoiceChannel` or `PrivateChannel`.
----@field message Message? The message the interaction was attached to. Currently only provided for components-based interactions.
----@field member Member? The member who interacted with the application in a guild.
----@field user User? The User object of who interacted with the application, should always be available..
----@field data table The raw data of the interaction. See [Interaction Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-resolved-data-structure).
----@field token string The interaction token. What allows you to responds to a specific interaction. This is a secret and shouldn't be exposed, if leaked anyone can send messages on behalf of your bot.
----@field version string The interaction version. (Currently not useful at all)
----@field locale string The locale settings of the user who executed this interaction.
----@field guildLocale string The guild's preferred locale, if said interaction was executed in a guild.
+---@field type number The Interaction's type, see `enums.interactionType`.
+---@field guildId string? The Snowflake ID of the guild the interaction was sent from, if any.
+---@field guild Guild? The Guild object the interaction was sent from. Equivalent to `Client:getGuild(Interaction.guildId)`.
+---@field channelId string The Snowflake ID of the channel the interaction was sent from. Should always be provided, but keep in mind Discord flags it as optional for future-proofing.
+---@field channel Channel? The Channel object the interaction was sent from. Equivalent to `Client:getChannel(Interaction.channelId)`. Can be `GuildTextChannel`, `GuildVoiceChannel` or `PrivateChannel`.
+---@field message Message? The message the components that invoked this interaction are attached to. Only provided for components-based interactions.
+---@field member Member? The member who invoked this interaction, if it was invoked in the context of a guild.
+---@field user User? The user that invoked this interaction, should be always available but always check.
+---@field data table The raw data of the interaction. See [Interaction Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-resolved-data-structure). Should be always available but Discord may not provide it in the future for some scenarios.
+---@field token string The interaction token. This is a secret and shouldn't be exposed, if leaked anyone can send messages on behalf of your bot.
+---@field version string The interaction version, currently this is always set to `1`.
+---@field appPermissions Permissions The permissions the app has in the source location of the interaction.
+---@field locale string? The locale settings of the user who executed this interaction, see [languages](https://discord.com/developers/docs/reference#locales) for list of possible values. Always available except on PING interactions.
+---@field guildLocale string The guild's preferred locale, if the interaction was executed in a guild, see [languages](https://discord.com/developers/docs/reference#locales) for list of possible values.
+---@field entitlements table An array of raw [Entitlement](https://discord.com/developers/docs/resources/entitlement#entitlement-object) objects for monetized apps the user that invoked this interaction has.
+---@field context number The context in which this interaction was invoked, see `enums.interactionContextType`.
 ---<!method-tags:http>
 ---@type Interaction | fun(data: table, parent: Client): Interaction
 local Interaction, get = class("Interaction", Snowflake)
@@ -37,134 +57,154 @@ local Interaction, get = class("Interaction", Snowflake)
 ---@type table
 local getter = get
 
+---@param data table
+---@param parent Client
+---@protected
 function Interaction:__init(data, parent)
   Snowflake.__init(self, data, parent)
-  self._api = parent._api -- a bit easier to navigate
   self._data = data.data
-
-  -- Handle guild and guild_id
-  do local guildId = data.guild_id
-    self._guild = guildId and parent._guilds:get(guildId)
-    if not self._guild and guildId then
-      local guild = self._api:getGuild(guildId)
-      if guild then
-        self._guild = parent._guilds:_insert(guild)
-      end
-    end
-  end
-
-  -- Handle channel and channel_id
-  do local channelId = data.channel_id
-    if not channelId then goto skip end
-    -- First try retrieving it from cache
-    if self._guild then
-      self._channel = self._guild:getChannel(channelId)
-    elseif not data.guild_id then
-      self._channel = parent._private_channels:get(channelId)
-    end
-    if self._channel then
-      goto skip
-    end
-
-    -- Last resort, request the channel object from the API if wasn't cached
-    local channel = self._api:getChannel(channelId)
-    if not channel then goto skip end -- somehow channel not available
-
-    if channel.guild_id then
-      local guild
-      if self._guild and channel.guild_id == self._guild.id then
-        guild = self._guild
-      else
-        local guild_data = self._api:getGuild(channel.guild_id)
-        if guild_data then
-          guild = parent._guilds:_insert(guild_data)
-        end
-      end
-
-      if guild then
-        if channel.type == channelType.text then
-          self._channel = guild._text_channels:_insert(channel)
-        elseif channel.type == channelType.voice then
-          self._channel = guild._voice_channels:_insert(channel)
-        end
-      end
-    elseif channel.type == channelType.private then
-      self._channel = parent._private_channels:_insert(channel)
-    end
-    ::skip::
-  end
-
-  -- Handle user and member
-  do
-    if data.member and self._guild then
-      self._member = self._guild._members:_insert(data.member)
-      self._user = parent._users:_insert(data.member.user)
-    elseif data.user then
-      self._user = parent._users:_insert(data.user)
-    end
-  end
-
-  -- Handle message
-  do
-    if not data.message then goto skip end
-    if self._channel then
-      self._message = self._channel._messages:_insert(data.message)
-    elseif data.message.channel then
-      local guild, cache = data.message.guild, nil
-      if guild then
-        guild = parent._guilds:_insert(guild)
-        cache = guild._text_channels:_insert(data.message.channel)
-      else
-        cache = parent._private_channels:_insert(data.message.channel)
-      end
-      self._message = cache and cache._messages:_insert(data.message)
-    end
-    if not self._message then self._message = nil end
-    ::skip::
-  end
-
-  -- Define Interaction state tracking
+  -- have we sent a response yet?
   self._initialRes = false
+  -- is the response we sent (if we have) deferred?
   self._deferred = false
+  self:_loadMore(data)
 end
 
+---@protected
+function Interaction:_load(data)
+	Snowflake._load(self, data)
+	return self:_loadMore(data)
+end
+
+---@protected
+function Interaction:_loadMore(data)
+  self:_loadGuild(data)
+  self:_loadChannel(data)
+  self:_loadMember(data)
+  self:_loadMessage(data)
+  self._entitlements = data.entitlements
+end
+
+local function getGuild(client, id)
+  if not id then
+    return
+  end
+  local guild = id and client._guilds:get(id)
+  if guild then
+    return guild
+  end
+  local d, err = client._api:getGuild(id)
+  if d then
+    return client._guilds:_insert(d)
+  else
+    return nil, err
+  end
+end
+
+---@protected
+function Interaction:_loadGuild(data)
+  if not data.guild_id then
+    return
+  end
+  self._guild = getGuild(self.parent, data.guild_id)
+end
+
+local function insertChannel(client, data, parent)
+  if data.guild_id and parent then
+    if data.type == channelType.text or data.type == channelType.news then
+      return parent._text_channels:_insert(data)
+    elseif data.type == channelType.voice then
+      return parent._voice_channels:_insert(data)
+    elseif data.type == channelType.category then
+      return parent._categories:_insert(data)
+    end
+  elseif data.type == channelType.private then
+    return client._private_channels:_insert(data)
+  elseif data.type == channelType.group then
+    return client._group_channels:_insert(data)
+  end
+end
+
+local function getChannel(client, channelId, guild)
+  local d, err = client._api:getChannel(channelId)
+  if not d then
+    return nil, err -- somehow the channel is unaccessible
+  end
+  return insertChannel(client, d, guild)
+end
+
+---@protected
+function Interaction:_loadChannel(data)
+  local channelId = data.channel_id
+  if not channelId then
+    return
+  end
+  -- first try retrieving it from cache
+  self._channel = self.parent:getChannel(channelId)
+  if self._channel then
+    return
+  end
+  -- last resort, request the channel object from the API if it isn't cached
+  self._channel = getChannel(self.parent, channelId, self._guild)
+end
+
+---@protected
+function Interaction:_loadMember(data)
+  if data.member and self._guild then
+    self._member = self._guild._members:_insert(data.member)
+    self._user = self.parent._users:_insert(data.member.user)
+  elseif data.user then
+    self._user = self.parent._users:_insert(data.user)
+  end
+end
+
+---@protected
+function Interaction:_loadMessage(data)
+  if not data.message then
+    return
+  end
+  if self._channel then
+    self._message = self._channel._messages:_insert(data.message)
+  end
+end
+
+---@protected
 function Interaction:_sendMessage(payload, files, deferred)
-  local data, err = self._api:createInteractionResponse(self.id, self._token, {
+  local data, err = self.parent._api:createInteractionResponse(self.id, self._token, {
     type = deferred and callbackType.deferredChannelMessage or callbackType.channelMessage,
     data = payload,
   }, files)
   if data then
     self._initialRes = true
     self._deferred = deferred or false
-    return true
+    return self._channel and self._channel._messages:_insert(data.resource.message) or true
   else
-    return false, err
+    return nil, err
   end
 end
 
+---@protected
 function Interaction:_sendFollowup(payload, files)
-  local data, err = self._api:createWebhookMessage(self._application_id, self._token, payload, files)
+  local data, err = self.parent._api:createWebhookMessage(self._application_id, self._token, payload, files)
   if data then
     return self._channel and self._channel._messages:_insert(data) or true
   else
-    return false, err
+    return nil, err
   end
 end
 
----Sends an interaction reply. An initial response is sent on first call of this,
----if an initial response was already sent a followup message is sent instead.
----If initial response was a deferred response, calling this will properly edit the deferred message.
----
----Returns may not be consistent because blame Discord.
----On initial response, expect this to return a boolean value representing success otherwise `false, err`.
----To get the sent reply in that case use `Interaction:getReply()`.
----On followups and edits, this will return the sent/edited message, otherwise `false, err`.
+---Sends an interaction reply. An initial response is sent on the first call,
+---if an initial response has already been sent a followup message is sent instead.
+---If the initial response was a deferred response, calling this will edit the deferred message.
 ---@param content string|table
 ---@param isEphemeral? boolean
----@return boolean|Message
+---@return Message|boolean
 function Interaction:reply(content, isEphemeral)
   isEphemeral = isEphemeral and true or type(content) == "table" and content.ephemeral
   local msg, files = resolveMessage(content)
+  if not msg then
+    return nil, files
+  end
 
   -- Handle flag masking
   if isEphemeral then
@@ -185,41 +225,43 @@ end
 ---Deferred replies can only be sent as initial responses.
 ---A deferred reply displays "Bot is thinking..." to users, and once `:reply` is called again, deferred message will be edited.
 ---
----Returns `true` on success, otherwise `false, err`.
+---Returns Message on success, otherwise `nil, err`.
 ---@param isEphemeral? boolean
----@return boolean
+---@return Message
 function Interaction:replyDeferred(isEphemeral)
   assert(not self._initialRes, "only the initial response can be deferred")
   local msg = isEphemeral and {flags = messageFlag.ephemeral} or nil
   return self:_sendMessage(msg, nil, true)
 end
 
----@alias Message-ID-Resolvable table
-
 ---Fetches a previously sent interaction response.
 ---If response `id` was not provided, the original interaction response is fetched instead.
----
----Note: **Ephemeral messages cannot be retrieved once sent.**
 ---@param id? Message-ID-Resolvable
 ---@return Message
 function Interaction:getReply(id)
   id = resolver.messageId(id) or "@original"
-  local data, err = self._api:getWebhookMessage(self._application_id, self._token, id)
-  return data and self._channel._messages:_insert(data), err
+  local data, err = self.parent._api:getWebhookMessage(self._application_id, self._token, id)
+  if data then
+    return self._channel._messages:_insert(data)
+  else
+    return nil, err
+  end
 end
 
 ---Modifies a previously sent interaction response.
 ---If response `id` was not provided, initial interaction response is edited instead.
----
----Note: **Ephemeral messages cannot be modified once sent.**
 ---@param content table|string
 ---@param id? Message-ID-Resolvable
----@return Message
+---@return boolean
 function Interaction:editReply(content, id)
-  id = resolver.messageId(id) or self._message.id
+  id = resolver.messageId(id) or "@original"
   local msg, files = resolveMessage(content)
-  local data, err = self._api:editWebhookMessage(self._application_id, self._token, id, msg, files)
-  return data and true, err
+  local data, err = self.parent._api:editWebhookMessage(self._application_id, self._token, id, msg, files)
+  if data then
+    return true
+  else
+    return false, err
+  end
 end
 
 ---Deletes a previously sent response. If response `id` was not provided, original interaction response is deleted instead.
@@ -231,12 +273,16 @@ end
 ---@return boolean
 function Interaction:deleteReply(id)
   id = resolver.messageId(id) or "@original"
-  local data, err = self._api:deleteWebhookMessage(self._application_id, self._token, id)
-  return data and true, err
+  local data, err = self.parent._api:deleteWebhookMessage(self._application_id, self._token, id)
+  if data then
+    return true
+  else
+    return false, err
+  end
 end
 
 function Interaction:_sendUpdate(payload, files)
-  local data, err = self._api:createInteractionResponse(self.id, self._token, {
+  local data, err = self.parent._api:createInteractionResponse(self.id, self._token, {
     type = payload and callbackType.updateMessage or callbackType.deferredUpdateMessage,
     data = payload,
   }, files)
@@ -257,18 +303,19 @@ end
 function Interaction:update(content)
   local t = type(content)
   assert(self._message, "UPDATE_MESSAGE is only supported by components-based interactions!")
-  assert(t == "string" or t == "table", "bad argument #2 to update (expected table|string)")
+  assert(t == "string" or t == "table", "bad argument #2 to update (expected table|string, got " .. t .. ')')
   local msg, files = resolveMessage(content)
   if not self._initialRes then
     return self:_sendUpdate(msg, files)
   end
-  local data, err = self._api:editMessage(self._message._parent._id, self._message._id, msg, files)
+  local data, err = self.parent._api:editMessage(self._message._parent._id, self._message._id, msg, files)
   if data then
     self._message:_setOldContent(data)
     self._message:_load(data)
     return true
+  else
+    return false, err
   end
-  return false, err
 end
 
 ---Responds to a component-based interaction by acknowledging the interaction.
@@ -283,21 +330,20 @@ function Interaction:updateDeferred()
 end
 
 ---Responds to an autocomplete interaction.
----`choices` is either a table that has `name` and `value` fields, or an array of said tables.
+---`choices` is an array of tables with the fields `name` and `value`.
 ---For example: `{{name = "choice#1", value = "val1"}, {name = "choice#2", value = "val2"}}`.
+---
+---See [option choice structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure) for more information on how to set a locale.
 ---
 ---Returns `true` on success, otherwise `false, err`.
 ---@param choices table
 ---@return boolean
 function Interaction:autocomplete(choices)
   assert(self._type == intrType.applicationCommandAutocomplete, "APPLICATION_COMMAND_AUTOCOMPLETE is only supported by application-based commands!")
-  choices = resolver.autocomplete(choices)
-  assert(type(choices) == "table", 'bad argument #1 to autocomplete (expected table)')
-  if choices.name and choices.value then
-    choices = {choices}
-  end
-  assert(#choices < 26, 'choices must not exceeds 25 choice')
-  local data, err = self._api:createInteractionResponse(self.id, self._token, {
+  choices = resolver.autocomplete(choices) ---@diagnostic disable-line: cast-local-type
+  assert(choices, 'bad argument #1 to autocomplete (expected table, got ' .. type(choices) .. ')')
+  assert(#choices <= 25, 'choices must not exceed 25')
+  local data, err = self.parent._api:createInteractionResponse(self.id, self._token, {
     type = callbackType.applicationCommandAutocompleteResult,
     data = {
       choices = choices,
@@ -311,7 +357,7 @@ function Interaction:autocomplete(choices)
 end
 
 function Interaction:_sendModal(payload)
-  local data, err = self._api:createInteractionResponse(self.id, self._token, {
+  local data, err = self.parent._api:createInteractionResponse(self.id, self._token, {
     type = callbackType.modal,
     data = payload,
   })
@@ -381,6 +427,18 @@ end
 
 function getter:guildLocale()
   return self._guild_locale
+end
+
+function getter:appPermissions()
+  return Permissions(self._app_permissions)
+end
+
+function getter:entitlements()
+  return self._entitlements
+end
+
+function getter:context()
+  return self._context
 end
 
 return Interaction
