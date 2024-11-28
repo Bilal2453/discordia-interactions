@@ -106,7 +106,16 @@ function Interaction:_loadGuild(data)
   if not data.guild_id then
     return
   end
-  self._guild = getGuild(self.parent, data.guild_id)
+  if data.guild then
+    local guild = data.guild
+    guild.emojis = guild.emojis or {}
+    guild.stickers = guild.stickers or {}
+    guild.roles = guild.roles or {}
+    guild = self.parent._guilds:_insert(data.guild)
+    self._guild = guild
+  else
+    self._guild = getGuild(self.parent, data.guild_id)
+  end
 end
 
 local function insertChannel(client, data, parent)
@@ -143,6 +152,14 @@ function Interaction:_loadChannel(data)
   self._channel = self.parent:getChannel(channelId)
   if self._channel then
     return
+  end
+  -- otherwise, try to use the partial channel object
+  if data.channel then
+    data.channel.permission_overwrites = {}
+    self._channel = insertChannel(self.parent, data.channel, self._guild)
+    if self._channel then
+      return
+    end
   end
   -- last resort, request the channel object from the API if it isn't cached
   self._channel = getChannel(self.parent, channelId, self._guild)
