@@ -26,6 +26,11 @@ enums.interactionCallbackType = {
   launchActivity                        = 12,
 }
 
+enums.applicationIntegrationType = {
+  guildInstall = 0,
+  userInstall  = 2,
+}
+
 enums.appCommandType = {
   chatInput = 1,
   user      = 2,

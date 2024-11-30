@@ -23,15 +23,19 @@ local bor = bit.bor
 local class = discordia.class
 local classes = class.classes
 local intrType = enums.interactionType
-local Snowflake = classes.Snowflake
-local Permissions = discordia.Permissions
 local messageFlag = assert(enums.messageFlag)
 local resolveMessage = resolver.message
 local callbackType = enums.interactionCallbackType
 local channelType = discordia.enums.channelType
 
+local Snowflake = classes.Snowflake
+local Permissions = discordia.Permissions
+
 ---Represents a [Discord Interaction](https://discord.com/developers/docs/interactions/receiving-and-responding#interactions)
 ---allowing you to receive and respond to user interactions.
+---
+---Note that on `interactionCreate` event Discord sends *partial* Guild/Channel/Member objects,
+---that means, any object obtained with the Interaction may or may not have specific properties set.
 ---@class Interaction: Snowflake
 ---@field applicationId string The application's unique snowflake ID.
 ---@field type number The Interaction's type, see `enums.interactionType`.
@@ -49,7 +53,8 @@ local channelType = discordia.enums.channelType
 ---@field locale string? The locale settings of the user who executed this interaction, see [languages](https://discord.com/developers/docs/reference#locales) for list of possible values. Always available except on PING interactions.
 ---@field guildLocale string The guild's preferred locale, if the interaction was executed in a guild, see [languages](https://discord.com/developers/docs/reference#locales) for list of possible values.
 ---@field entitlements table An array of raw [Entitlement](https://discord.com/developers/docs/resources/entitlement#entitlement-object) objects for monetized apps the user that invoked this interaction has.
----@field context number The context in which this interaction was invoked, see `enums.interactionContextType`.
+---@field integrationOwners table Mapping of installation contexts that the interaction was authorized for to related user or guild IDs. See [Authorizing Integration Owners Object](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-authorizing-integration-owners-object) for details
+---@field context number? The context in which this interaction was invoked, see `enums.interactionContextType`.
 ---<!method-tags:http>
 ---@type Interaction | fun(data: table, parent: Client): Interaction
 local Interaction, get = class("Interaction", Snowflake)
@@ -63,10 +68,8 @@ local getter = get
 function Interaction:__init(data, parent)
   Snowflake.__init(self, data, parent)
   self._data = data.data
-  -- have we sent a response yet?
-  self._initialRes = false
-  -- is the response we sent (if we have) deferred?
-  self._deferred = false
+  self._initialRes = false -- have we sent a response yet?
+  self._deferred = false -- is the response we sent (if we have) deferred?
   self:_loadMore(data)
 end
 
@@ -83,38 +86,29 @@ function Interaction:_loadMore(data)
   self:_loadMember(data)
   self:_loadMessage(data)
   self._entitlements = data.entitlements
-end
-
-local function getGuild(client, id)
-  if not id then
-    return
-  end
-  local guild = id and client._guilds:get(id)
-  if guild then
-    return guild
-  end
-  local d, err = client._api:getGuild(id)
-  if d then
-    return client._guilds:_insert(d)
-  else
-    return nil, err
-  end
+  self._authorizing_integration_owners = data.authorizing_integration_owners
 end
 
 ---@protected
 function Interaction:_loadGuild(data)
-  if not data.guild_id then
+  if not data.guild_id or not data.guild then
     return
   end
-  if data.guild then
+  -- retrieve guild from cache if possible
+  self._guild = self.parent:getGuild(data.guild_id)
+  if self._guild then
+    return
+  end
+  -- use the partial object
+  if not self._guild then
     local guild = data.guild
-    guild.emojis = guild.emojis or {}
+    -- required fields for initialization
     guild.stickers = guild.stickers or {}
+    guild.emojis = guild.emojis or {}
     guild.roles = guild.roles or {}
-    guild = self.parent._guilds:_insert(data.guild)
-    self._guild = guild
-  else
-    self._guild = getGuild(self.parent, data.guild_id)
+    -- create and cache the partial guild
+    self._guild = self.parent._guilds:_insert(guild)
+    self._guild._partial = true
   end
 end
 
@@ -134,14 +128,6 @@ local function insertChannel(client, data, parent)
   end
 end
 
-local function getChannel(client, channelId, guild)
-  local d, err = client._api:getChannel(channelId)
-  if not d then
-    return nil, err -- somehow the channel is unaccessible
-  end
-  return insertChannel(client, d, guild)
-end
-
 ---@protected
 function Interaction:_loadChannel(data)
   local channelId = data.channel_id
@@ -153,16 +139,11 @@ function Interaction:_loadChannel(data)
   if self._channel then
     return
   end
-  -- otherwise, try to use the partial channel object
+  -- otherwise, use the partial channel object
   if data.channel then
     data.channel.permission_overwrites = {}
     self._channel = insertChannel(self.parent, data.channel, self._guild)
-    if self._channel then
-      return
-    end
   end
-  -- last resort, request the channel object from the API if it isn't cached
-  self._channel = getChannel(self.parent, channelId, self._guild)
 end
 
 ---@protected
@@ -177,15 +158,14 @@ end
 
 ---@protected
 function Interaction:_loadMessage(data)
-  if not data.message then
+  if not data.message or not self._channel then
     return
   end
-  if self._channel then
-    self._message = self._channel._messages:_insert(data.message)
-  end
+  self._message = self._channel._messages:_insert(data.message)
 end
 
 ---@protected
+---@return (Message|boolean)?, string? err
 function Interaction:_sendMessage(payload, files, deferred)
   local data, err = self.parent._api:createInteractionResponse(self.id, self._token, {
     type = deferred and callbackType.deferredChannelMessage or callbackType.channelMessage,
@@ -194,17 +174,26 @@ function Interaction:_sendMessage(payload, files, deferred)
   if data then
     self._initialRes = true
     self._deferred = deferred or false
-    return self._channel and self._channel._messages:_insert(data.resource.message) or true
+    if self._channel then
+      return self._channel._messages:_insert(data.resource.message)
+    else
+      return true
+    end
   else
     return nil, err
   end
 end
 
 ---@protected
+---@return (Message|boolean)?, string? err
 function Interaction:_sendFollowup(payload, files)
   local data, err = self.parent._api:createWebhookMessage(self._application_id, self._token, payload, files)
   if data then
-    return self._channel and self._channel._messages:_insert(data) or true
+    if self._channel then
+      return self._channel._messages:_insert(data)
+    else
+      return true
+    end
   else
     return nil, err
   end
@@ -213,6 +202,9 @@ end
 ---Sends an interaction reply. An initial response is sent on the first call,
 ---if an initial response has already been sent a followup message is sent instead.
 ---If the initial response was a deferred response, calling this will edit the deferred message.
+---
+---Returns Message on success, otherwise `nil, err`.
+---If `Interaction.channel` was not available, `true` will be returned instead of Message.
 ---@param content string|table
 ---@param isEphemeral? boolean
 ---@return Message|boolean
@@ -222,13 +214,11 @@ function Interaction:reply(content, isEphemeral)
   if not msg then
     return nil, files
   end
-
-  -- Handle flag masking
+  -- handle flag masking
   if isEphemeral then
     msg.flags = bor(type(msg.flags) == "number" and msg.flags or 0, messageFlag.ephemeral)
   end
-
-  -- Choose desired method depending on the context
+  -- choose desired method depending on the context
   local method
   if self._initialRes or self._deferred then
     method = self._sendFollowup
@@ -240,11 +230,12 @@ end
 
 ---Sends a deferred interaction reply.
 ---Deferred replies can only be sent as initial responses.
----A deferred reply displays "Bot is thinking..." to users, and once `:reply` is called again, deferred message will be edited.
+---A deferred reply displays "Bot is thinking..." to users, and once `:reply` is called again, the deferred message will be edited.
 ---
 ---Returns Message on success, otherwise `nil, err`.
+---If `Interaction.channel` was not available, `true` will be returned instead of Message.
 ---@param isEphemeral? boolean
----@return Message
+---@return Message|boolean
 function Interaction:replyDeferred(isEphemeral)
   assert(not self._initialRes, "only the initial response can be deferred")
   local msg = isEphemeral and {flags = messageFlag.ephemeral} or nil
@@ -252,7 +243,7 @@ function Interaction:replyDeferred(isEphemeral)
 end
 
 ---Fetches a previously sent interaction response.
----If response `id` was not provided, the original interaction response is fetched instead.
+---If `id` was not provided, the original interaction response is fetched instead.
 ---@param id? Message-ID-Resolvable
 ---@return Message
 function Interaction:getReply(id)
@@ -266,7 +257,7 @@ function Interaction:getReply(id)
 end
 
 ---Modifies a previously sent interaction response.
----If response `id` was not provided, initial interaction response is edited instead.
+---If `id` was not provided, the initial interaction response is edited instead.
 ---@param content table|string
 ---@param id? Message-ID-Resolvable
 ---@return boolean
@@ -282,10 +273,9 @@ function Interaction:editReply(content, id)
 end
 
 ---Deletes a previously sent response. If response `id` was not provided, original interaction response is deleted instead.
+---If `id` was not provided, the initial interaction response is deleted instead.
 ---
 ---Returns `true` on success, otherwise `false, err`.
----
----Note: **Ephemeral messages cannot be deleted once sent.**
 ---@param id? Message-ID-Resolvable
 ---@return boolean
 function Interaction:deleteReply(id)
@@ -385,6 +375,13 @@ function Interaction:_sendModal(payload)
   end
 end
 
+---Responds to an interaction by opening a Modal, also known as Text Inputs.
+---By default this method takes the [raw structure](https://discord.com/developers/docs/interactions/message-components#text-inputs) defined by Discord
+---but other extensions may also provide their own abstraction, see for example [discordia-modals](https://github.com/Bilal2453/discordia-modals/wiki/Modal).
+---
+---Returns `true` on success, otherwise `false, err`.
+---@param modal table
+---@return boolean
 function Interaction:modal(modal)
   modal = resolver.modal(modal)
   return self:_sendModal(modal)
@@ -452,6 +449,10 @@ end
 
 function getter:entitlements()
   return self._entitlements
+end
+
+function getter:integrationOwners()
+  return self._authorizing_integration_owners
 end
 
 function getter:context()
