@@ -65,6 +65,7 @@ local getter = get
 ---@param data table
 ---@param parent Client
 ---@protected
+---<!ignore>
 function Interaction:__init(data, parent)
   Snowflake.__init(self, data, parent)
   self._data = data.data
