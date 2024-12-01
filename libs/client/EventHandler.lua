@@ -1,16 +1,23 @@
 local Interaction = require("containers/Interaction")
 local events = {
-  interaction_create_prelisteners = {}
+  interaction_create_prelisteners = {},
+  interaction_create_postlisteners = {},
 }
+
+local function emitListeners(listeners, ...)
+  for _, v in pairs(listeners) do
+    v(...)
+  end
+end
 
 function events.INTERACTION_CREATE(d, client)
   local interaction = Interaction(d, client)
-  for _, v in pairs(events.interaction_create_prelisteners) do
-    v(interaction, client)
-  end
-  return client:emit("interactionCreate", interaction)
+  emitListeners(events.interaction_create_prelisteners, interaction, client)
+  client:emit("interactionCreate", interaction)
+  emitListeners(events.interaction_create_postlisteners, interaction, client)
 end
 
+-- This code is part of Discordia
 local function checkReady(shard)
 	for _, v in pairs(shard._loading) do
 		if next(v) then return end
