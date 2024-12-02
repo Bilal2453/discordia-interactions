@@ -76,8 +76,8 @@ end
 
 ---@protected
 function Interaction:_load(data)
-	Snowflake._load(self, data)
-	return self:_loadMore(data)
+  Snowflake._load(self, data)
+  return self:_loadMore(data)
 end
 
 ---@protected
@@ -92,7 +92,7 @@ end
 
 ---@protected
 function Interaction:_loadGuild(data)
-  if not data.guild_id or not data.guild then
+  if not data.guild_id then
     return
   end
   -- retrieve guild from cache if possible
@@ -101,7 +101,7 @@ function Interaction:_loadGuild(data)
     return
   end
   -- use the partial object
-  if not self._guild then
+  if data.guild then
     local guild = data.guild
     -- required fields for initialization
     guild.stickers = guild.stickers or {}
@@ -349,8 +349,8 @@ end
 function Interaction:autocomplete(choices)
   assert(self._type == intrType.applicationCommandAutocomplete, "APPLICATION_COMMAND_AUTOCOMPLETE is only supported by application-based commands!")
   choices = resolver.autocomplete(choices) ---@diagnostic disable-line: cast-local-type
-  assert(choices, 'bad argument #1 to autocomplete (expected table, got ' .. type(choices) .. ')')
-  assert(#choices <= 25, 'choices must not exceed 25')
+  assert(choices, "bad argument #1 to autocomplete (expected table, got " .. type(choices) .. ')')
+  assert(#choices <= 25, "choices must not exceed 25")
   local data, err = self.parent._api:createInteractionResponse(self.id, self._token, {
     type = callbackType.applicationCommandAutocompleteResult,
     data = {
