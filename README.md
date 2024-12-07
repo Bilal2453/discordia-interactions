@@ -1,5 +1,8 @@
 # Introduction
 
+![Version](https://img.shields.io/github/v/release/Bilal2453/discordia-interactions)
+![License](https://img.shields.io/github/license/Bilal2453/discordia-interactions)
+
 discordia-interactions is an extension library that enables [Discordia](https://github.com/SinisterRectus/discordia) to receive and respond to [Discord Interactions](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-interaction-callback-type).
 This is done over the gateway websocket connection that [Discordia](https://github.com/SinisterRectus/discordia) offers, and aims to be very extensible so other extensions and libraries can build upon without having to worry about compatibility with each other.
 
@@ -52,7 +55,7 @@ This change sadly adds complexity to the user, but it was absolutely required in
 
 ## Examples
 
-**Take a look at the [[examples]] directory.**
+**Take a look at the [examples](https://github.com/Bilal2453/discordia-interactions/tree/main/examples) directory for the actual examples.**
 
 Here is a bit of a usage run down:
 
