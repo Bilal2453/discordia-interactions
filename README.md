@@ -20,11 +20,21 @@ This only implements the interactions portion, for App commands such as Message 
 
 ## Installing
 
+You can install this extension with Lit using the following steps:
+
+1. Install `lit` if not already installed, see [Luvit installation guide](https://luvit.io/install.html) and [Discordia installation Tutorial](https://github.com/SinisterRectus/Discordia/wiki/Installing-Discordia).
+2. Open a terminal (PowerShell or CMD on Windows) and preferably `cd` into your bot's directory (e.x. `cd C:\Users\X\Desktop\MyBot` then enter).
+3. In the terminal, execute `lit install Bilal2453/discordia-interactions`.
+(Note: if you have not set up your PATH, you might have to do `./lit` instead of just `lit`)
+
+Once that is done, you should see Lit print the message `done: success`, indicating you are now ready to require the extension from your Discordia project.
+
 Due to a bug in Lit, the Lit upstream version of this library won't install, you have to manually clone it.
 
-1. Run `cd PATH` replace `PATH` with your bot's directory path.
-2. Run `git clone https://github.com/Bilal2453/discordia-interactions.git ./deps/discordia-interactions`.
-3. Make sure you now have a folder `discordia-interactions` in your `deps` directory after running the last command.
+You may also install the latest main branch by replacing the command in step 3 with:
+```sh
+git clone https://github.com/Bilal2453/discordia-interactions.git ./deps/discordia-interactions`
+```
 
 ## Documentation
 
