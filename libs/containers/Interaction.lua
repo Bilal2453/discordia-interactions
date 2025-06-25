@@ -175,7 +175,7 @@ function Interaction:_sendMessage(payload, files, deferred)
   if data then
     self._initialRes = true
     self._deferred = deferred or false
-    if self._channel then
+    if self._channel and self._channel._messages then
       return self._channel._messages:_insert(data.resource.message)
     else
       return true
